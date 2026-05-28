@@ -5,10 +5,12 @@ import pandas as pd
 
 from src.rpc.websocket import get_shared
 from dashboard.components import render_auto_trade_controls
+from dashboard.helpers import ensure_mt5
 
 
 def render():
     st.title("📊 Dashboard Overview")
+    ensure_mt5()
     robot = st.session_state.robot
 
     # ── Handle Close Position Action from URL query params ──

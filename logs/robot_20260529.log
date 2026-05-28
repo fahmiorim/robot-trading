@@ -15063,3 +15063,30 @@ Cycle #410
 2026-05-29 06:47:50 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
 2026-05-29 06:47:50 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
 2026-05-29 06:47:50 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8771
+2026-05-29 06:48:05 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:48:05 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:48:05 | INFO     | src.data.provider | Incremental: 5 new candles
+2026-05-29 06:48:05 | INFO     | src.services.strategy_service |   Breakout: return=-0.04%, trades=62, wr=22.6%
+2026-05-29 06:48:06 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.01%, trades=100, wr=38.0%
+2026-05-29 06:48:06 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=61.3%
+2026-05-29 06:48:06 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=224, wr=25.9%
+2026-05-29 06:48:07 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=48.8%
+2026-05-29 06:48:07 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:48:07 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:48:07 | INFO     | src.services.strategy_service |   Breakout: return=-0.04%, trades=62, wr=22.6%
+2026-05-29 06:48:07 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.01%, trades=100, wr=38.0%
+2026-05-29 06:48:08 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=61.3%
+2026-05-29 06:48:08 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=224, wr=25.9%
+2026-05-29 06:48:08 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=48.8%
+2026-05-29 06:48:08 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:48:08 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:49:04 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:49:04 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:49:04 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:49:04 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:49:04 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:49:04 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:49:04 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:49:04 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:49:04 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:49:04 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8765

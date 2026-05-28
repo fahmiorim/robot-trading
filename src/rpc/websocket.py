@@ -23,6 +23,8 @@ logger = get_logger(__name__)
 # ── Cross-thread shared state ────────────────────────────────
 _shared_state: Dict[str, Any] = {}
 _shared_lock = threading.Lock()
+_active_server = None
+_active_server_lock = threading.Lock()
 
 
 def set_shared(key: str, value: Any) -> None:
@@ -62,8 +64,20 @@ class WebSocketRPC(IRPC):
     # ── Lifecycle ─────────────────────────────────────────────
 
     def start(self) -> None:
+        global _active_server
         if self._running:
             return
+
+        with _active_server_lock:
+            if _active_server is not None:
+                try:
+                    logger.info("Stopping previous WebSocket server instance...")
+                    _active_server.stop()
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.error(f"Error stopping previous WS server: {e}")
+            _active_server = self
+
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True,
                                         name="ws-server")
@@ -147,7 +161,7 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
     """Start background thread that polls the exchange and broadcasts."""
     def _push():
         err_count = 0
-        while True:
+        while ws._running:
             try:
                 symbol = config.get("general", "symbol")
                 exchange = getattr(bot, "exchange", None)
