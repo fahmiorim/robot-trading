@@ -251,7 +251,10 @@ def render():
     </script>
     """.replace("{ws_port}", str(ws_port))
 
-    st.markdown(realtime_panel_html, unsafe_allow_html=True)
+    # Clean up empty lines from HTML to prevent markdown parser from splitting the HTML block
+    realtime_panel_html_clean = "\n".join([line for line in realtime_panel_html.split("\n") if line.strip() != ""])
+
+    st.markdown(realtime_panel_html_clean, unsafe_allow_html=True)
 
     # ── Trading & Execution Controls ──
     st.subheader("💱 Trading & Execution")
