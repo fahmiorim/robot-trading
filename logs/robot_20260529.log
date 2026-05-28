@@ -15157,3 +15157,47 @@ Cycle #410
 2026-05-29 06:52:43 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
 2026-05-29 06:52:43 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
 2026-05-29 06:52:43 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8765
+2026-05-29 06:54:10 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:54:10 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:54:10 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:54:10 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:54:10 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:54:10 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:54:10 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:54:10 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:54:10 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:54:10 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:11 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:11 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:12 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:12 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:13 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:13 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:14 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:14 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:15 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:15 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:16 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:16 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:17 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:17 | WARNING  | src.rpc.websocket | WS server port 8765 in use, retrying in 0.5s... (Error: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8765): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted)
+2026-05-29 06:54:25 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:54:25 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:54:25 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:54:25 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:54:25 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:54:25 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:54:25 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:54:25 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:54:25 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:54:25 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8765
+2026-05-29 06:54:33 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:54:33 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:54:33 | INFO     | src.data.provider | Incremental: 6 new candles
+2026-05-29 06:54:34 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=62, wr=29.0%
+2026-05-29 06:54:34 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.01%, trades=102, wr=35.3%
+2026-05-29 06:54:35 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=58.1%
+2026-05-29 06:54:35 | INFO     | src.services.strategy_service |   MACD: return=-0.16%, trades=226, wr=23.0%
+2026-05-29 06:54:35 | INFO     | src.services.strategy_service |   Bollinger: return=-0.10%, trades=166, wr=56.6%
+2026-05-29 06:54:35 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:54:35 | INFO     | src.services.strategy_service | Best strategy: Breakout (weighted: -0.00)

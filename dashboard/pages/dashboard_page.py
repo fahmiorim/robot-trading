@@ -143,34 +143,42 @@ def render():
                 ws.onmessage = function(e){
                     try {
                         const d = JSON.parse(e.data);
+                        console.log("WebSocket data received:", d);
                         
                         // Update Bot Status
                         if (d.status) {
-                            document.getElementById('rt-bot-symbol').textContent = d.price.symbol || '—';
+                            if (d.price) {
+                                document.getElementById('rt-bot-symbol').textContent = d.price.symbol || '—';
+                            }
                             document.getElementById('rt-bot-tf').textContent = d.status.timeframe || '—';
                             document.getElementById('rt-bot-mode').textContent = d.status.paper_trading ? '📝 Paper' : '💵 Real';
                             document.getElementById('rt-bot-cycles').textContent = d.status.cycles || '0';
                             
                             const regimeEl = document.getElementById('rt-bot-regime');
-                            regimeEl.textContent = d.status.regime || '—';
-                            const colors = {'TRENDING':'#10b981','RANGING':'#f59e0b','CHOPPY':'#ef4444'};
-                            regimeEl.style.color = colors[d.status.regime.toUpperCase()] || '#ffffff';
+                            if (regimeEl) {
+                                const regimeStr = d.status.regime || '—';
+                                regimeEl.textContent = regimeStr;
+                                const colors = {'TRENDING':'#10b981','RANGING':'#f59e0b','CHOPPY':'#ef4444'};
+                                regimeEl.style.color = colors[regimeStr.toUpperCase()] || '#ffffff';
+                            }
                             
                             document.getElementById('rt-bot-best-strat').textContent = d.status.best_strategy || '—';
                         }
                         
                         // Update Account Info
                         if (d.account) {
-                            document.getElementById('rt-acc-balance').textContent = '$' + Number(d.account.balance).toFixed(2);
-                            document.getElementById('rt-acc-equity').textContent = '$' + Number(d.account.equity).toFixed(2);
-                            document.getElementById('rt-acc-margin').textContent = '$' + Number(d.account.free_margin).toFixed(2);
-                            document.getElementById('rt-acc-margin-lvl').textContent = Number(d.account.margin_level).toFixed(2) + '%';
+                            document.getElementById('rt-acc-balance').textContent = '$' + Number(d.account.balance || 0).toFixed(2);
+                            document.getElementById('rt-acc-equity').textContent = '$' + Number(d.account.equity || 0).toFixed(2);
+                            document.getElementById('rt-acc-margin').textContent = '$' + Number(d.account.free_margin || 0).toFixed(2);
+                            document.getElementById('rt-acc-margin-lvl').textContent = Number(d.account.margin_level || 0).toFixed(2) + '%';
                             
                             // Compute Daily P&L (Equity - Balance)
-                            const pnl = Number(d.account.equity) - Number(d.account.balance);
+                            const pnl = Number(d.account.equity || 0) - Number(d.account.balance || 0);
                             const pnlEl = document.getElementById('rt-acc-pnl');
-                            pnlEl.textContent = (pnl >= 0 ? '+' : '-') + '$' + Math.abs(pnl).toFixed(2);
-                            pnlEl.style.color = pnl >= 0 ? '#10b981' : '#ef4444';
+                            if (pnlEl) {
+                                pnlEl.textContent = (pnl >= 0 ? '+' : '-') + '$' + Math.abs(pnl).toFixed(2);
+                                pnlEl.style.color = pnl >= 0 ? '#10b981' : '#ef4444';
+                            }
                         }
                         
                         // Update Risk Snapshot
@@ -229,12 +237,15 @@ def render():
                                 tbody.innerHTML = html;
                             }
                         }
-                    } catch(_){}
+                    } catch(err){
+                        console.error("Error processing websocket message:", err);
+                    }
                 };
                 ws.onclose = function(){
                     reconnectTimer = setTimeout(connect, 2000);
                 };
-            } catch(_){
+            } catch(err){
+                console.error("Error establishing connection:", err);
                 reconnectTimer = setTimeout(connect, 3000);
             }
         }
