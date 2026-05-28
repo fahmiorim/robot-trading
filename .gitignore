@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data & models
+models/*.pkl
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config with secrets
+config.json
+
+nul

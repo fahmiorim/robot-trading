@@ -1,0 +1,275 @@
+[
+  {
+    "strategy": "MA_Crossover",
+    "timeframe": "TIMEFRAME_M1",
+    "best_params": {
+      "fast_period": 30,
+      "slow_period": 54
+    },
+    "score": 59.812,
+    "metrics": {
+      "total_return": -0.011323566293685871,
+      "sharpe_ratio": -40.91,
+      "max_drawdown": 0.052981184930460064,
+      "win_rate": 38.24,
+      "num_trades": 136.0
+    },
+    "elapsed": 16.3,
+    "n_trials": 30
+  },
+  {
+    "strategy": "RSI",
+    "timeframe": "TIMEFRAME_M1",
+    "best_params": {
+      "period": 9,
+      "overbought": 85,
+      "oversold": 15
+    },
+    "score": 56.814,
+    "metrics": {
+      "total_return": -0.02897266763535299,
+      "sharpe_ratio": -34.093,
+      "max_drawdown": 0.04932617120043273,
+      "win_rate": 54.17,
+      "num_trades": 96.0
+    },
+    "elapsed": 18.0,
+    "n_trials": 30
+  },
+  {
+    "strategy": "MACD",
+    "timeframe": "TIMEFRAME_M1",
+    "best_params": {
+      "fast": 20,
+      "slow": 38,
+      "signal": 13
+    },
+    "score": 76.088,
+    "metrics": {
+      "total_return": -0.17940886774849785,
+      "sharpe_ratio": -55.535,
+      "max_drawdown": 0.18266941000061077,
+      "win_rate": 30.3,
+      "num_trades": 330.0
+    },
+    "elapsed": 17.1,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Bollinger",
+    "timeframe": "TIMEFRAME_M1",
+    "best_params": {
+      "period": 10,
+      "std_dev": 3.0
+    },
+    "score": -0.0,
+    "metrics": {
+      "total_return": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown": 0.0,
+      "win_rate": 0.0,
+      "num_trades": 0.0
+    },
+    "elapsed": 16.2,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Breakout",
+    "timeframe": "TIMEFRAME_M1",
+    "best_params": {
+      "lookback": 38
+    },
+    "score": 53.269,
+    "metrics": {
+      "total_return": -0.02155836294603432,
+      "sharpe_ratio": -35.645,
+      "max_drawdown": 0.052905323913436504,
+      "win_rate": 34.88,
+      "num_trades": 86.0
+    },
+    "elapsed": 15.5,
+    "n_trials": 30
+  },
+  {
+    "strategy": "MA_Crossover",
+    "timeframe": "TIMEFRAME_M5",
+    "best_params": {
+      "fast_period": 30,
+      "slow_period": 30
+    },
+    "score": -0.0,
+    "metrics": {
+      "total_return": 0.0,
+      "sharpe_ratio": 0.0,
+      "max_drawdown": 0.0,
+      "win_rate": 0.0,
+      "num_trades": 0.0
+    },
+    "elapsed": 17.2,
+    "n_trials": 30
+  },
+  {
+    "strategy": "RSI",
+    "timeframe": "TIMEFRAME_M5",
+    "best_params": {
+      "period": 7,
+      "overbought": 73,
+      "oversold": 25
+    },
+    "score": 58.447,
+    "metrics": {
+      "total_return": -0.08589664836466909,
+      "sharpe_ratio": -35.762,
+      "max_drawdown": 0.1014542597818284,
+      "win_rate": 64.17,
+      "num_trades": 374.0
+    },
+    "elapsed": 16.1,
+    "n_trials": 30
+  },
+  {
+    "strategy": "MACD",
+    "timeframe": "TIMEFRAME_M5",
+    "best_params": {
+      "fast": 10,
+      "slow": 26,
+      "signal": 10
+    },
+    "score": 63.147,
+    "metrics": {
+      "total_return": -0.45831182181456825,
+      "sharpe_ratio": -44.843,
+      "max_drawdown": 0.46172752554467145,
+      "win_rate": 31.64,
+      "num_trades": 550.0
+    },
+    "elapsed": 19.1,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Bollinger",
+    "timeframe": "TIMEFRAME_M5",
+    "best_params": {
+      "period": 25,
+      "std_dev": 1.752306175477314
+    },
+    "score": 59.146,
+    "metrics": {
+      "total_return": 0.03158105892200183,
+      "sharpe_ratio": -24.544,
+      "max_drawdown": 0.07174271833539775,
+      "win_rate": 58.82,
+      "num_trades": 204.0
+    },
+    "elapsed": 15.2,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Breakout",
+    "timeframe": "TIMEFRAME_M5",
+    "best_params": {
+      "lookback": 21
+    },
+    "score": 56.405,
+    "metrics": {
+      "total_return": -0.27420043418414936,
+      "sharpe_ratio": -35.052,
+      "max_drawdown": 0.3011505125119371,
+      "win_rate": 26.51,
+      "num_trades": 166.0
+    },
+    "elapsed": 15.2,
+    "n_trials": 30
+  },
+  {
+    "strategy": "MA_Crossover",
+    "timeframe": "TIMEFRAME_M15",
+    "best_params": {
+      "fast_period": 5,
+      "slow_period": 10
+    },
+    "score": 58.869,
+    "metrics": {
+      "total_return": -0.3502333275955425,
+      "sharpe_ratio": -36.486,
+      "max_drawdown": 0.4218230957570449,
+      "win_rate": 40.69,
+      "num_trades": 752.0
+    },
+    "elapsed": 16.6,
+    "n_trials": 30
+  },
+  {
+    "strategy": "RSI",
+    "timeframe": "TIMEFRAME_M15",
+    "best_params": {
+      "period": 7,
+      "overbought": 61,
+      "oversold": 34
+    },
+    "score": 77.076,
+    "metrics": {
+      "total_return": -0.3843480349752645,
+      "sharpe_ratio": -31.252,
+      "max_drawdown": 0.4147078227945499,
+      "win_rate": 57.69,
+      "num_trades": 676.0
+    },
+    "elapsed": 15.8,
+    "n_trials": 30
+  },
+  {
+    "strategy": "MACD",
+    "timeframe": "TIMEFRAME_M15",
+    "best_params": {
+      "fast": 8,
+      "slow": 33,
+      "signal": 7
+    },
+    "score": 59.343,
+    "metrics": {
+      "total_return": -0.48909081305222574,
+      "sharpe_ratio": -35.759,
+      "max_drawdown": 0.5654777594557927,
+      "win_rate": 33.33,
+      "num_trades": 654.0
+    },
+    "elapsed": 17.7,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Bollinger",
+    "timeframe": "TIMEFRAME_M15",
+    "best_params": {
+      "period": 14,
+      "std_dev": 1.5877795073587453
+    },
+    "score": 84.871,
+    "metrics": {
+      "total_return": -0.07402247164369329,
+      "sharpe_ratio": -23.817,
+      "max_drawdown": 0.21152098224162105,
+      "win_rate": 55.96,
+      "num_trades": 386.0
+    },
+    "elapsed": 16.2,
+    "n_trials": 30
+  },
+  {
+    "strategy": "Breakout",
+    "timeframe": "TIMEFRAME_M15",
+    "best_params": {
+      "lookback": 11
+    },
+    "score": 60.137,
+    "metrics": {
+      "total_return": -0.20306128586300476,
+      "sharpe_ratio": -28.532,
+      "max_drawdown": 0.22606337061408338,
+      "win_rate": 31.39,
+      "num_trades": 274.0
+    },
+    "elapsed": 14.1,
+    "n_trials": 30
+  }
+]
