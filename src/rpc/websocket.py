@@ -52,6 +52,7 @@ class WebSocketRPC(IRPC):
         self._loop: asyncio.AbstractEventLoop = None
         self._thread: threading.Thread = None
         self._running = False
+        self.server = None
 
     def name(self) -> str:
         return f"WebSocket ({self.host}:{self.port})"
@@ -86,6 +87,11 @@ class WebSocketRPC(IRPC):
 
     def stop(self) -> None:
         self._running = False
+        if self.server:
+            try:
+                self.server.close()
+            except Exception:
+                pass
         if self._loop and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._loop.stop)
 
@@ -110,23 +116,24 @@ class WebSocketRPC(IRPC):
             self._loop = None
 
     async def _serve(self) -> None:
-        for attempt in range(10):
-            port = self.port + attempt
+        while self._running:
             try:
-                async with websockets.serve(
-                    self._handler, self.host, port,
+                self.server = await websockets.serve(
+                    self._handler, self.host, self.port,
                     ping_interval=20, ping_timeout=10,
-                ):
-                    self.port = port
-                    set_shared("ws_port", port)
-                    logger.info(f"WS ready on ws://{self.host}:{port}")
-                    await asyncio.Future()  # run forever
-                    return
-            except OSError:
-                if attempt < 9:
-                    continue
-                raise
-        logger.warning(f"All ports {self.port}–{self.port + 9} in use")
+                )
+                set_shared("ws_port", self.port)
+                logger.info(f"WS ready on ws://{self.host}:{self.port}")
+                
+                while self._running:
+                    await asyncio.sleep(0.5)
+                
+                self.server.close()
+                await self.server.wait_closed()
+                return
+            except OSError as e:
+                logger.warning(f"WS server port {self.port} in use, retrying in 0.5s... (Error: {e})")
+                await asyncio.sleep(0.5)
 
     async def _handler(self, ws: WebSocketServerProtocol) -> None:
         self.clients.add(ws)
