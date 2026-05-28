@@ -31,9 +31,9 @@ from src.services.risk_service import RiskService
 from src.services.notification_service import NotificationService
 from src.services.backtest_service import BacktestService
 from src.repositories.analytics_repo import AnalyticsRepository
-from src.trading.pairlist import PairlistManager
-from src.trading.order_manager import OrderManager
-from src.trading.lock_manager import LockManager
+from src.services.trading.pairlist import PairlistManager
+from src.services.trading.order_manager import OrderManager
+from src.services.trading.lock_manager import LockManager
 from src.models.trade import Trade, TradeManager
 from src.risk.manager import RiskManager
 from src.risk.protection import ProtectionManager

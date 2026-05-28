@@ -12,7 +12,7 @@ from src.ml.model import MLModel  # noqa: F401
 from src.backtesting.engine import Backtester  # noqa: F401
 from src.configuration.manager import ConfigManager  # noqa: F401
 from src.risk.manager import RiskManager  # noqa: F401
-from src.trading.engine import TradingBot as AIRobot  # noqa: F401
+from src.services.trading.engine import TradingBot as AIRobot  # noqa: F401
 
 # ── MVC Architecture (v2.2.0) ──
 # Models (pure data)

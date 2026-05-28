@@ -14,7 +14,7 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-MODEL_PATH = "models/latest_model.pkl"
+MODEL_PATH = "trained_models/latest_model.pkl"
 
 
 class Trainer:
@@ -91,6 +91,11 @@ class Trainer:
             logger.info("Retrain interval elapsed, retraining ML model...")
             return self.train(data)
         return None
+
+    def predict(self, data: pd.DataFrame) -> int:
+        """Predict trading signal using the underlying model."""
+        pred = self.model.predict(data)
+        return int(pred.item()) if hasattr(pred, "item") else int(pred[0])
 
     @property
     def is_trained(self) -> bool:

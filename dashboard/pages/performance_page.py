@@ -1,25 +1,78 @@
+"""Performance Analytics page — actual trade history, backtesting, advanced stats, hyperopt."""
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import time
 
 from dashboard.helpers import ensure_mt5, refresh_robot
+from dashboard.components import render_trade_metrics
+from src.exchange.helpers import get_trade_history
 from src.controllers.dashboard_controller import DashboardController
 
 
 def render():
-    st.title("📈 Backtest & Hyperopt")
+    st.title("📊 Performance & Analytics")
     config = st.session_state.config
     robot = st.session_state.robot
     results = st.session_state.backtest_results or {}
+    dc = st.session_state.get("dashboard_ctrl", DashboardController())
 
-    # ── Controls ──
-    tab_backtest, tab_hyperopt, tab_advanced = st.tabs(["▶️ Backtest", "🧬 Hyperopt", "📊 Advanced Analyzers"])
+    tab_labels = ["📜 Trade History", "▶️ Backtest Simulation", "📊 Advanced Analyzers", "🧬 Parameter Hyperopt"]
+    tabs = st.tabs(tab_labels)
 
-    with tab_backtest:
+    # ── TAB 1: TRADE HISTORY ──
+    with tabs[0]:
+        st.markdown("### 📜 Real Trade History")
+        days = st.slider("Select History Range (Days)", 1, 365, 30)
+        source = st.radio("History Source", ["🤖 Robot Database", "📊 MT5 Platform"], horizontal=True)
+
+        try:
+            if source == "🤖 Robot Database":
+                history = dc.get_trade_history(limit=500)
+                if history:
+                    df = pd.DataFrame(history)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    render_trade_metrics(df, profit_col="profit")
+
+                    summary = dc.get_trade_summary(days)
+                    if summary:
+                        st.subheader("📊 Aggregate Stats")
+                        c1, c2, c3, c4 = st.columns(4)
+                        with c1:
+                            st.metric("Total Trades", int(summary.get('total_trades', 0)))
+                        with c2:
+                            st.metric("Open Trades", int(summary.get('open_trades', 0)))
+                        with c3:
+                            st.metric("Total P&L", f"${summary.get('total_profit', 0):.2f}")
+                        with c4:
+                            st.metric("Win Rate", f"{summary.get('win_rate', 0):.1f}%")
+                else:
+                    st.info("No trade history in database")
+            else:
+                if ensure_mt5():
+                    history = get_trade_history(days)
+                    if history is not None and len(history) > 0:
+                        st.dataframe(history, use_container_width=True)
+                        profit_col = next((c for c in ['profit', 'Profit', 'pnl', 'P&L'] if c in history.columns), None)
+                        if profit_col:
+                            render_trade_metrics(history, profit_col=profit_col)
+                        else:
+                            st.info("No profit column found in MT5 data")
+                    else:
+                        st.info("No trade history found from MT5")
+                else:
+                    st.warning("MT5 not connected")
+        except Exception as e:
+            st.error(f"Error loading trade history: {e}")
+
+    # ── TAB 2: BACKTEST SIMULATION ──
+    with tabs[1]:
+        st.markdown("### ▶️ Historical Backtester")
         bt1, bt2 = st.columns([1, 3])
         with bt1:
-            if st.button("▶️ Run Full Backtest", width='stretch', type="primary"):
+            if st.button("▶️ Run Full Backtest", use_container_width=True, type="primary"):
                 with st.spinner("Running backtest..."):
                     try:
                         data = st.session_state.get("_last_data")
@@ -33,7 +86,7 @@ def render():
                     except Exception as e:
                         st.error(f"Backtest error: {e}")
         with bt2:
-            if st.button("📥 Fetch & Backtest", width='stretch'):
+            if st.button("📥 Fetch & Backtest", use_container_width=True):
                 with st.spinner("Fetching & backtesting..."):
                     try:
                         if not ensure_mt5():
@@ -78,7 +131,7 @@ def render():
                     "Calmar": f"{r.get('calmar_ratio', 0):.2f}",
                     "Profit Factor": f"{r.get('profit_factor', 1):.2f}",
                 })
-            st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
             st.subheader("📈 Equity Curves")
             fig = go.Figure()
@@ -87,27 +140,27 @@ def render():
                 if eq:
                     fig.add_trace(go.Scatter(y=eq, name=name, mode='lines', line=dict(width=1.5)))
             fig.update_layout(height=400, xaxis_title="Step", yaxis_title="Equity ($)", hovermode='x unified')
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
 
             st.subheader(f"📝 Trades: {best_name}")
             trades = best.get('trades', [])
             if trades:
                 tdf = pd.DataFrame(trades)
-                st.dataframe(tdf, width='stretch', hide_index=True)
+                st.dataframe(tdf, use_container_width=True, hide_index=True)
                 if 'profit_pct' in tdf.columns:
                     fig2 = px.histogram(tdf, x='profit_pct', nbins=30, title="P&L Distribution",
                                         labels={'profit_pct': 'Profit %'})
-                    st.plotly_chart(fig2, width='stretch')
+                    st.plotly_chart(fig2, use_container_width=True)
             else:
                 st.info("No trades recorded")
 
-    # ═══ TAB: ADVANCED ANALYZERS (inspired by Backtrader) ═══
-    with tab_advanced:
+    # ── TAB 3: ADVANCED ANALYZERS ──
+    with tabs[2]:
         if not results:
-            st.info("💡 Run a backtest first to see advanced analytics.")
+            st.info("💡 Run a backtest first in the Backtest tab to see advanced analytics.")
         else:
             st.markdown("""
-            <div class="info-banner" style="border-color: rgba(139,92,246,0.15);">
+            <div class="info-banner" style="border-color: rgba(99,102,241,0.15);">
                 <div class="title">🧠 Advanced Analyzers</div>
                 <div class="desc">Sortino Ratio • Calmar Ratio • Profit Factor • Streaks • Time in Market • Monthly Returns</div>
             </div>
@@ -116,7 +169,7 @@ def render():
             selected_strat = st.selectbox("Pilih Strategy", list(results.keys()), key="adv_strat_select")
             r = results[selected_strat]
 
-            # ── Ratios & Annualised Metrics ──
+            # Ratios & Annualised Metrics
             aa1, aa2, aa3, aa4, aa5, aa6 = st.columns(6)
             with aa1:
                 sortino = r.get('sortino_ratio', 0)
@@ -140,7 +193,7 @@ def render():
                 exp_pct = r.get('expectancy_pct', 0)
                 st.metric("Expectancy %", f"{exp_pct:.3f}%", help="Expected return per trade as % of balance")
 
-            # ── Streaks, Expectancy Ratio & Averages ──
+            # Streaks, Expectancy Ratio & Averages
             aa7, aa8, aa9, aa10, aa11, aa12 = st.columns(6)
             with aa7:
                 _aw = r.get('avg_win_pct', 0)
@@ -159,7 +212,6 @@ def render():
             with aa12:
                 st.metric("Avg Loss %", f"{r.get('avg_loss_pct', 0):.1f}%")
 
-            # ── Current Streaks (smaller, info row) ──
             cur_w = r.get('current_win_streak', 0)
             cur_l = r.get('current_loss_streak', 0)
             if cur_w > 0 or cur_l > 0:
@@ -176,7 +228,7 @@ def render():
                     mdf['return'] = (mdf['profit'] / init_bal) * 100
                 elif 'return' not in mdf.columns:
                     mdf['return'] = 0.0
-                mdf['color'] = mdf['return'].apply(lambda x: '#26a69a' if x > 0 else '#ef5350')
+                mdf['color'] = mdf['return'].apply(lambda x: '#10b981' if x > 0 else '#ef4444')
                 fig_m = go.Figure()
                 fig_m.add_trace(go.Bar(
                     x=mdf['month'], y=mdf['return'],
@@ -191,28 +243,11 @@ def render():
                     hovermode='x unified',
                     template='plotly_dark',
                 )
-                st.plotly_chart(fig_m, width='stretch')
+                st.plotly_chart(fig_m, use_container_width=True)
             else:
                 st.info("Monthly data not available (no datetime index or no trades)")
 
             st.markdown("---")
-            st.markdown("### 📊 Trade Statistics")
-            trades_list = r.get('trades', [])
-            if trades_list:
-                tdf = pd.DataFrame(trades_list)
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.metric("Total Trades", f"{r.get('num_trades', 0)}")
-                    wins = sum(1 for t in trades_list if t.get('profit_pct', 0) > 0)
-                    losses = sum(1 for t in trades_list if t.get('profit_pct', 0) < 0)
-                    st.metric("Winning Trades", f"{wins}")
-                    st.metric("Losing Trades", f"{losses}")
-                with c2:
-                    st.metric("Win Rate", f"{r.get('win_rate', 0):.1f}%")
-                    st.metric("Max Drawdown", f"{r.get('max_drawdown', 0):.2f}%")
-                    st.metric("Time in Market", f"{r.get('time_in_market_pct', 0):.1f}%")
-
-            # ── Radar Chart ──
             st.markdown("### 🎯 Strategy Quality Radar")
             radar_categories = ['Return', 'Sharpe', 'Sortino', 'Win Rate', 'Profit Factor', 'Calmar']
             radar_values = [
@@ -234,22 +269,21 @@ def render():
             ))
             fig_radar.update_layout(
                 polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 10],
-                                    gridcolor='rgba(255,255,255,0.1)'),
+                    radialaxis=dict(visible=True, range=[0, 10], gridcolor='rgba(255,255,255,0.1)'),
                     bgcolor='rgba(0,0,0,0)',
                 ),
                 height=400,
                 template='plotly_dark',
                 margin=dict(l=60, r=30, t=10, b=30),
             )
-            st.plotly_chart(fig_radar, width='stretch')
+            st.plotly_chart(fig_radar, use_container_width=True)
 
-    # ═══ TAB: HYPEROPT ═══
-    with tab_hyperopt:
+    # ── TAB 4: PARAMETER OPTIMIZER ──
+    with tabs[3]:
         st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(255,167,38,0.08), rgba(255,167,38,0.02)); border: 1px solid rgba(255,167,38,0.12); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
-            <div style="font-size: 0.8rem; font-weight: 600; color: #ffa726;">🧬 Hyperopt Engine</div>
-            <div style="font-size: 0.7rem; opacity: 0.5;">Automatic parameter optimization — random search → TPE-inspired refinement</div>
+        <div style="background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.02)); border: 1px solid rgba(99,102,241,0.12); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc;">🧬 Hyperopt Engine</div>
+            <div style="font-size: 0.72rem; opacity: 0.55;">Automatic parameter optimization — random search → refinement</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -278,8 +312,7 @@ def render():
             with ho3:
                 st.markdown("<br>", unsafe_allow_html=True)
                 disabled = st.session_state.hyperopt_running
-                if st.button("🧬 RUN HYPEROPT", width='stretch', type="primary", disabled=disabled):
-
+                if st.button("🧬 RUN HYPEROPT", use_container_width=True, type="primary", disabled=disabled):
                     st.session_state.hyperopt_running = True
                     st.rerun()
 
@@ -315,7 +348,6 @@ def render():
 
                     status_text.success("✅ All strategies optimized!")
                 else:
-                    # Single strategy
                     registry = BaseStrategy.get_registry()
                     if ho_strategy in registry:
                         strat_cls = registry[ho_strategy]
@@ -334,17 +366,15 @@ def render():
                     else:
                         st.error(f"Strategy '{ho_strategy}' not found in registry")
 
-                st.session_state.hyperopt_results = ho_results
+                st.session_state.ho_results = ho_results
                 st.session_state.hyperopt_running = False
                 st.rerun()
 
-            # ── Display Hyperopt Results ──
-            ho_results = st.session_state.hyperopt_results
+            ho_results = st.session_state.get("ho_results", {})
             if ho_results:
                 st.markdown("---")
                 st.subheader("🏆 Hyperopt Results")
 
-                # Summary row
                 ho_summary_cols = st.columns(4)
                 with ho_summary_cols[0]:
                     best_sid = max(ho_results.keys(), key=lambda k: ho_results[k]['score'])
@@ -359,7 +389,6 @@ def render():
                     total_time = sum(r['elapsed'] for r in ho_results.values())
                     st.metric("Total Time", f"{total_time:.1f}s")
 
-                # Per-strategy detail
                 for sid, hresult in ho_results.items():
                     with st.expander(f"🧬 {sid} — Score: {hresult['score']:.2f}", expanded=True):
                         cols = st.columns([1, 1])
@@ -374,7 +403,6 @@ def render():
                                 v = m.get(k, 0)
                                 st.markdown(f"- **{k}:** {v:.2f}")
 
-                        # Apply to config button
                         if st.button(f"📥 Apply {sid} Params to Config", key=f"ho_apply_{sid}"):
                             for k, v in hresult['params'].items():
                                 config.set('strategies', sid, k, v)
@@ -383,9 +411,8 @@ def render():
                             st.success(f"✅ {sid} params applied to config and robot reloaded!")
                             st.rerun()
 
-                # Apply all button
                 st.markdown("---")
-                if st.button("📥 Apply ALL Best Params to Config", width='stretch', type="primary"):
+                if st.button("📥 Apply ALL Best Params to Config", use_container_width=True, type="primary"):
                     for sid, hresult in ho_results.items():
                         for k, v in hresult['params'].items():
                             config.set('strategies', sid, k, v)
@@ -397,11 +424,9 @@ def render():
                 if not st.session_state.hyperopt_running:
                     st.info("💡 Click **RUN HYPEROPT** to start parameter optimization")
 
-            # Previous runs from DB
             st.markdown("---")
             with st.expander("📚 Previous Hyperopt Runs (from Database)"):
                 try:
-                    dc = st.session_state.get("dashboard_ctrl", DashboardController())
                     prev_runs = dc.get_all_hyperopt_results()
                     if prev_runs:
                         for row in prev_runs:
@@ -415,4 +440,3 @@ def render():
                         st.info("No previous hyperopt runs found in DB")
                 except Exception as e:
                     st.info(f"Could not load from DB: {e}")
-

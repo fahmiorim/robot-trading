@@ -7,14 +7,22 @@ Two WS connections:
 
 # ── Compact live ticker bar (always visible at top) ──
 _LIVE_WIDGET_HTML = r"""
-<div style="background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005)); border: 1px solid rgba(255,255,255,0.04); border-radius: 10px; padding: 0.3rem 0.8rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 20px; font-size: 0.75rem; overflow: hidden;">
-    <span class="live-dot red" style="flex-shrink:0;"></span>
-    <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.65rem; opacity: 0.5; flex-shrink:0;">LIVE</span>
-    <span id="ticker-symbol" style="font-weight: 700; min-width: 60px;">—</span>
-    <span id="ticker-bid" style="font-weight: 700; color: #2dd4bf; min-width: 80px;">—</span>
-    <span id="ticker-ask" style="font-weight: 600; color: #f87171; min-width: 80px;">—</span>
-    <span id="ticker-spread" style="opacity: 0.5; min-width: 50px;">—</span>
-    <span id="ticker-change" style="min-width: 60px;">—</span>
+<div style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, rgba(25, 25, 45, 0.4), rgba(15, 15, 26, 0.2)); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 0.5rem 1.2rem; margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 0.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.15); backdrop-filter: blur(10px);">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="live-dot red" style="flex-shrink:0;"></span>
+        <span style="font-weight: 800; font-size: 0.65rem; color: #ef4444; letter-spacing: 0.1em; text-transform: uppercase;">LIVE FEED</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+        <div><span style="opacity: 0.45; font-size: 0.7rem; font-weight: 500;">SYMBOL</span> <strong id="ticker-symbol" style="font-weight: 700; color: #ffffff; margin-left: 4px;">—</strong></div>
+        <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.08);"></div>
+        <div><span style="opacity: 0.45; font-size: 0.7rem; font-weight: 500;">BID</span> <strong id="ticker-bid" style="font-weight: 800; color: #10b981; margin-left: 4px;">—</strong></div>
+        <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.08);"></div>
+        <div><span style="opacity: 0.45; font-size: 0.7rem; font-weight: 500;">ASK</span> <strong id="ticker-ask" style="font-weight: 800; color: #ef4444; margin-left: 4px;">—</strong></div>
+        <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.08);"></div>
+        <div><span style="opacity: 0.45; font-size: 0.7rem; font-weight: 500;">SPREAD</span> <strong id="ticker-spread" style="font-weight: 600; opacity: 0.8; margin-left: 4px; color: #c7d2fe;">—</strong></div>
+        <div style="width: 1px; height: 12px; background: rgba(255,255,255,0.08);"></div>
+        <div><span style="opacity: 0.45; font-size: 0.7rem; font-weight: 500;">CHANGE</span> <strong id="ticker-change" style="font-weight: 700; margin-left: 4px;">—</strong></div>
+    </div>
 </div>
 <script>
 (function(){
@@ -34,7 +42,7 @@ _LIVE_WIDGET_HTML = r"""
                     if(d.c !== undefined){
                         const sign = d.c >= 0 ? '+' : '';
                         chgEl.textContent = sign + d.c.toFixed(2) + '%';
-                        chgEl.style.color = d.c >= 0 ? '#2dd4bf' : '#f87171';
+                        chgEl.style.color = d.c >= 0 ? '#10b981' : '#ef4444';
                     }
                 } catch(_){}
             };
@@ -52,20 +60,27 @@ _LIVE_WIDGET_HTML = r"""
 
 # ── Real-time account/status strip (powered by WS RPC on port 8765) ──
 REALTIME_DASHBOARD_HTML = r"""
-<div id="realtime-dashboard" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:0.5rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:0.6rem 1rem; font-size:0.72rem; transition:opacity 0.3s;">
-    <div style="display:flex; align-items:center; gap:6px;">
-        <span style="opacity:0.4; font-size:0.6rem;">MT5</span>
-        <span id="ws-mt5" style="font-size:0.85rem;">&ndash;</span>
+<div id="realtime-dashboard" style="font-family: 'Outfit', sans-serif; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:0.8rem; background:rgba(20,20,35,0.35); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:0.7rem 1.2rem; font-size:0.78rem; transition:all 0.3s; box-shadow:0 4px 15px rgba(0,0,0,0.15); backdrop-filter: blur(10px);">
+    <div style="display:flex; align-items:center; gap:8px;">
+        <span style="opacity:0.45; font-size:0.65rem; font-weight:700; letter-spacing:0.05em;">PLATFORM</span>
+        <span id="ws-mt5" style="font-size:0.9rem;">&ndash;</span>
     </div>
-    <div class="vr" style="width:1px; background:rgba(255,255,255,0.06);"></div>
-    <div><span style="opacity:0.4;">Balance</span> <strong id="ws-balance" style="color:#2dd4bf;">&ndash;</strong></div>
-    <div><span style="opacity:0.4;">Equity</span> <strong id="ws-equity" style="color:#22c55e;">&ndash;</strong></div>
-    <div><span style="opacity:0.4;">Margin</span> <strong id="ws-margin">&ndash;</strong></div>
-    <div><span style="opacity:0.4;">Margin Lvl</span> <strong id="ws-margin-level">&ndash;</strong></div>
-    <div class="vr" style="width:1px; background:rgba(255,255,255,0.06);"></div>
-    <div><span style="opacity:0.4;">Regime</span> <strong id="ws-regime" style="font-weight:700;">&ndash;</strong></div>
-    <div><span style="opacity:0.4;">Strategy</span> <strong id="ws-strategy">&ndash;</strong></div>
-    <div><span style="opacity:0.4;">Positions</span> <strong id="ws-positions">&ndash;</strong></div>
+    <div class="vr" style="width:1px; height:18px; background:rgba(255,255,255,0.08);"></div>
+    
+    <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">BALANCE</span> <strong id="ws-balance" style="color:#ffffff; font-weight:700; margin-left:4px;">&ndash;</strong></div>
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">EQUITY</span> <strong id="ws-equity" style="color:#10b981; font-weight:700; margin-left:4px;">&ndash;</strong></div>
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">FREE MARGIN</span> <strong id="ws-margin" style="color:#ffffff; font-weight:600; margin-left:4px;">&ndash;</strong></div>
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">MARGIN LVL</span> <strong id="ws-margin-level" style="color:#ffffff; font-weight:600; margin-left:4px;">&ndash;</strong></div>
+    </div>
+    
+    <div class="vr" style="width:1px; height:18px; background:rgba(255,255,255,0.08);"></div>
+    
+    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">REGIME</span> <strong id="ws-regime" style="font-weight:800; text-transform:uppercase; margin-left:4px; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.05);">&ndash;</strong></div>
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">STRATEGY</span> <strong id="ws-strategy" style="color:#a5b4fc; font-weight:700; margin-left:4px;">&ndash;</strong></div>
+        <div><span style="opacity:0.45; font-weight:550; font-size:0.7rem;">POSITIONS</span> <span id="ws-positions" style="font-weight:700; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc; border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; margin-left:4px;">&ndash;</span></div>
+    </div>
 </div>
 <script>
 (function(){
@@ -91,14 +106,19 @@ REALTIME_DASHBOARD_HTML = r"""
                         var el = document.getElementById('ws-regime');
                         if(el){
                             el.textContent = d.status.regime || '\u2014';
-                            var colors = {'TRENDING':'#22c55e','RANGING':'#f59e0b','CHOPPY':'#ef4444'};
-                            el.style.color = colors[d.status.regime] || '#666';
+                            var colors = {'TRENDING':'#10b981','RANGING':'#f59e0b','CHOPPY':'#ef4444'};
+                            var bgColors = {'TRENDING':'rgba(16, 185, 129, 0.1)','RANGING':'rgba(245, 158, 11, 0.1)','CHOPPY':'rgba(239, 68, 68, 0.1)'};
+                            var borderColors = {'TRENDING':'rgba(16, 185, 129, 0.25)','RANGING':'rgba(245, 158, 11, 0.25)','CHOPPY':'rgba(239, 68, 68, 0.25)'};
+                            
+                            el.style.color = colors[d.status.regime.toUpperCase()] || '#ffffff';
+                            el.style.backgroundColor = bgColors[d.status.regime.toUpperCase()] || 'rgba(255,255,255,0.04)';
+                            el.style.borderColor = borderColors[d.status.regime.toUpperCase()] || 'rgba(255,255,255,0.05)';
                         }
                         var el2 = document.getElementById('ws-strategy');
                         if(el2) el2.textContent = d.status.best_strategy || '\u2014';
                         var el5 = document.getElementById('ws-mt5');
                         if(el5){
-                            el5.textContent = d.status.mt5_connected ? '\u2705' : '\u274c';
+                            el5.innerHTML = d.status.mt5_connected ? '<span style="color:#10b981; font-weight:700;">🟢 CONNECTED</span>' : '<span style="color:#ef4444; font-weight:700;">🔴 DISCONNECTED</span>';
                             el5.title = d.status.mt5_connected ? 'MT5 Connected' : 'MT5 Disconnected';
                         }
                     }

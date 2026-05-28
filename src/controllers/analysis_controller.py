@@ -74,15 +74,17 @@ class AnalysisController:
     def get_trade_history(self, limit: int = 100,
                           offset: int = 0) -> List[Dict]:
         """Get trade history from repository."""
-        return self.trade_repo.get_trade_history(limit=limit, offset=offset)
+        trades = self.trade_repo.find_all(limit=limit, offset=offset)
+        return [t.to_dict() for t in trades]
 
     def get_open_trades(self) -> List[Dict]:
         """Get currently open trades."""
-        return self.trade_repo.get_open_trades()
+        trades = self.trade_repo.find_open()
+        return [t.to_dict() for t in trades]
 
     def get_trade_summary(self, days: int = 7) -> Dict:
         """Get trade summary statistics."""
-        return self.trade_repo.get_trade_summary(days=days)
+        return self.trade_repo.summary(days=days)
 
     def get_equity_curve(self, days: int = 30) -> List[Dict]:
         """Get equity curve data."""

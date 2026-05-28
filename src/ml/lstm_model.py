@@ -30,17 +30,19 @@ class DeepLearningTrader:
         self.is_trained = False
     
     def prepare_sequences(self, data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        scaled_data = self.scaler.fit_transform(data[['open', 'high', 'low', 'close', 'volume']].values)
+        volume_col = "volume" if "volume" in data.columns else "tick_volume"
+        scaled_data = self.scaler.fit_transform(data[['open', 'high', 'low', 'close', volume_col]].values)
         X, y = [], []
         for i in range(self.sequence_length, len(scaled_data)):
             X.append(scaled_data[i-self.sequence_length:i])
             price_change = scaled_data[i, 3] - scaled_data[i-1, 3]
+            # Map classes: SELL -> 0, HOLD -> 1, BUY -> 2
             if price_change > 0.001:
-                y.append(1)
+                y.append(2)
             elif price_change < -0.001:
-                y.append(-1)
-            else:
                 y.append(0)
+            else:
+                y.append(1)
         return np.array(X), np.array(y)
     
     def train(self, data: pd.DataFrame, epochs: int = 50, batch_size: int = 32) -> float:
@@ -68,13 +70,21 @@ class DeepLearningTrader:
     def predict(self, data: pd.DataFrame) -> np.ndarray:
         if not self.is_trained:
             raise ValueError("Model must be trained first")
-        scaled_data = self.scaler.transform(data[['open', 'high', 'low', 'close', 'volume']].values)
-        X = []
-        for i in range(self.sequence_length, len(scaled_data)):
-            X.append(scaled_data[i-self.sequence_length:i])
-        X = torch.FloatTensor(np.array(X))
+        
+        volume_col = "volume" if "volume" in data.columns else "tick_volume"
+        if len(data) < self.sequence_length:
+            return np.array([0])
+            
+        scaled_data = self.scaler.transform(data[['open', 'high', 'low', 'close', volume_col]].values)
+        
+        # Ambil sequence terakhir berukuran sequence_length
+        last_sequence = scaled_data[-self.sequence_length:]
+        X = torch.FloatTensor(np.array([last_sequence]))
+        
         self.model.eval()
         with torch.no_grad():
             outputs = self.model(X)
-            predictions = torch.argmax(outputs, dim=1).numpy()
-        return predictions
+            pred_class = torch.argmax(outputs, dim=1).item()
+            pred_signal = pred_class - 1  # Petakan balik [0, 1, 2] -> [-1, 0, 1]
+            
+        return np.array([pred_signal])

@@ -89,7 +89,7 @@ class OrderManager:
         if time.time() - self._last_paper_trade_time < 10:
             return {"success": False, "error": "Paper cooldown (10s)"}
 
-        price = self._get_price()
+        price = self._get_price(symbol)
         slippage_pct = self.config.get("backtest", "slippage_pct")
         spread_cost = price.get("ask", 0) - price.get("bid", 0)
         if signal == 1:
@@ -140,7 +140,7 @@ class OrderManager:
             pass
         for pos in list(self.paper_positions):
             if pos["ticket"] == ticket:
-                price = self._get_price()
+                price = self._get_price(pos["symbol"])
                 exit_p = price["bid"] if pos["action"] == "BUY" else price["ask"]
                 pnl = self._calc_paper_pnl(pos, exit_p)
                 pos["profit"] = pnl
@@ -194,7 +194,7 @@ class OrderManager:
         if not self.exchange.ensure_connection():
             return {"success": False, "error": "Exchange not connected"}
 
-        price = self._get_price()
+        price = self._get_price(symbol)
         if not price or price.get("ask", 0) <= 0 or price.get("bid", 0) <= 0:
             return {"success": False, "error": "Invalid price"}
         entry = price["ask"] if signal == 1 else price["bid"]
@@ -222,7 +222,7 @@ class OrderManager:
         if not self.exchange.ensure_connection():
             return {"success": False, "error": "Exchange not connected"}
 
-        price = self._get_price()
+        price = self._get_price(symbol)
         if not price or price.get("ask", 0) <= 0 or price.get("bid", 0) <= 0:
             return {"success": False, "error": "Invalid price"}
         entry = price["ask"] if signal == 1 else price["bid"]
@@ -271,7 +271,7 @@ class OrderManager:
         if not entry_result.get("success"):
             return entry_result
 
-        price = self._get_price()
+        price = self._get_price(symbol)
         entry = price["ask"] if signal == 1 else price["bid"]
         if volume is None:
             vol = self.config.get("trading", "paper_lot_size")
@@ -303,5 +303,5 @@ class OrderManager:
             return self.close_paper_position(ticket)
         return self.exchange.close_position(str(ticket))
 
-    def _get_price(self) -> Dict[str, float]:
-        return self.exchange.fetch_ticker("XAUUSD")
+    def _get_price(self, symbol: str) -> Dict[str, float]:
+        return self.exchange.fetch_ticker(symbol)

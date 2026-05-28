@@ -16,7 +16,7 @@ import threading
 import time
 from typing import Optional
 
-from src.trading.engine import TradingBot
+from src.services.trading.engine import TradingBot
 from src.utils.logging import get_logger
 from src.rpc.websocket import set_shared
 

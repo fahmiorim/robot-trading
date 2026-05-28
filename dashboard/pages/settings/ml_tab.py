@@ -26,7 +26,7 @@ def render(config) -> bool:
                 edited = True
 
     st.markdown("---")
-    if st.button("🧠 Retrain ML Now", width='stretch'):
+    if st.button("🧠 Retrain ML Now", use_container_width=True):
         data = st.session_state.get("_last_data")
         if data is not None:
             with st.spinner("Training..."):

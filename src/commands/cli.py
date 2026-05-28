@@ -74,7 +74,7 @@ class TradingBotCLI:
             return subprocess.call(cmd)
 
         if command == "trade":
-            from src.trading.engine import TradingBot
+            from src.services.trading.engine import TradingBot
             from src.configuration.manager import ConfigManager
             from src.utils.logging import get_logger
 
@@ -95,9 +95,8 @@ class TradingBotCLI:
             return 0
 
         if command == "backtest":
-            from src.backtesting.engine import Backtester
+            from src.services.trading.engine import TradingBot
             from src.configuration.manager import ConfigManager
-            from src.data.provider import DataProvider
             from src.utils.logging import get_logger
 
             logger = get_logger("cli.backtest")
@@ -107,27 +106,43 @@ class TradingBotCLI:
             config.set("general", "data_count", parsed.days * 96)  # ~96 candles/day for M15
 
             logger.info(f"Running backtest: {parsed.symbol} @ {parsed.timeframe}, {parsed.days}d")
-            provider = DataProvider(config)
-            data = provider.fetch_data()
-            backtester = Backtester(config)
-            results = backtester.run(data)
-            print(f"Backtest results: {results}")
+            
+            bot = TradingBot(config=config)
+            data = bot.fetch_data()
+            results = bot.run_backtest_all(data)
+            
+            print("Backtest results:")
+            for name, r in results.items():
+                print(f"  - {name}: return={r['total_return']:.2f}%, trades={r['num_trades']}, win_rate={r.get('win_rate', 0):.1f}%")
             return 0
 
         if command == "hyperopt":
+            from src.backtesting.engine import Backtester
             from src.backtesting.hyperopt import Hyperopt
             from src.configuration.manager import ConfigManager
+            from src.data.provider import DataProvider
+            from src.strategy.implementations.ma_crossover import MACrossoverStrategy
             from src.utils.logging import get_logger
 
             logger = get_logger("cli.hyperopt")
             config = ConfigManager()
             config.set("general", "symbol", parsed.symbol)
             config.set("general", "timeframe", parsed.timeframe)
+            config.set("general", "data_count", 2000)
 
             logger.info(f"Running hyperopt: {parsed.epochs} epochs")
-            hp = Hyperopt(config=config)
-            results = hp.optimize(n_trials=parsed.epochs)
-            print(f"Hyperopt results: {results}")
+            provider = DataProvider(exchange=None, symbol=parsed.symbol, timeframe=parsed.timeframe, db=config.repository._db)
+            # data_provider requires exchange, but inside provider.py it will use get_db if needed. Wait, exchange is required. Let's see:
+            # provider = DataProvider(exchange=None) is ok for db-cache, but for MT5 fetching we should get exchange from TradingController or ExchangeFactory.
+            from src.exchange.factory import ExchangeFactory
+            exchange = ExchangeFactory.from_config(config)
+            provider = DataProvider(exchange, symbol=parsed.symbol, timeframe=parsed.timeframe, db=config.repository._db)
+            data = provider.fetch()
+            
+            backtester = Backtester(config)
+            hp = Hyperopt(config, backtester)
+            results = hp.optimize(MACrossoverStrategy, data, n_calls=parsed.epochs)
+            print(f"Hyperopt results: {results.params} with score {results.score}")
             return 0
 
         return 0

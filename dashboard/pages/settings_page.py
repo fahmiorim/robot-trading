@@ -58,14 +58,14 @@ def render():
     st.markdown("---")
     cs1, cs2, cs3 = st.columns([1, 1, 3])
     with cs1:
-        if st.button("\U0001f4be Save Config", width='stretch', type="primary"):
+        if st.button("\U0001f4be Save Config", use_container_width=True, type="primary"):
             if config.save():
                 refresh_robot(config)
                 st.success("Saved & robot reloaded!")
             else:
                 st.error("Save failed!")
     with cs2:
-        if st.button("\U0001f504 Reset Defaults", width='stretch'):
+        if st.button("\U0001f504 Reset Defaults", use_container_width=True):
             config.reset_to_defaults()
             config.save()
             refresh_robot(config)
@@ -73,3 +73,21 @@ def render():
     with cs3:
         if edited:
             st.info("\u26a1 Changes detected \u2014 click Save Config")
+
+    # ── ABOUT SYSTEM INFO ────────────────────────────────────
+    st.markdown("---")
+    with st.expander("ℹ️ About AI Trading Robot v2.0", expanded=False):
+        st.markdown("""
+        ### 🤖 AI Trading Robot v2.0
+        
+        **Features:**
+        - **Multi-Strategy Core**: 5 technical strategies (MA Crossover, RSI, MACD, Bollinger Bands, Breakout)
+        - **ML Integration**: Random Forest / Gradient Boosting / LSTM single-step prediction
+        - **Market Regime Filter**: ADX-based regime classifier (Trending, Ranging, Choppy)
+        - **Swarm Intelligence**: Weighted ensemble voting for trading consensus
+        - **Backtester**: Tick-accurate historical simulation (slippage, spread, commission)
+        - **Risk Controller**: Circuit breaker, daily drawdown, daily loss, cooldown timer
+        - **Notification RPC**: Telegram alerts and real-time WebSocket dashboard
+        
+        **Tech Stack:** Python, MetaTrader 5, pandas, numpy, scikit-learn, Streamlit, Plotly
+        """)

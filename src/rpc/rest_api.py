@@ -210,8 +210,10 @@ class RestAPI:
         def daily(x_api_key: Optional[str] = Header(None)):
             self._verify_api_key(x_api_key)
             try:
+                from src.repositories.trade_repo import TradeRepository
                 from src.persistence.database import get_db
-                summary = get_db().get_trade_summary(days=1)
+                repo = TradeRepository(get_db())
+                summary = repo.summary(days=1)
                 return summary
             except Exception as e:
                 raise HTTPException(500, str(e))

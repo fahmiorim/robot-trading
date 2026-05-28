@@ -45,7 +45,7 @@ def _init_session_state():
         st.session_state.dashboard_ctrl = DashboardController(config=config)
 
     if "worker" not in st.session_state:
-        st.session_state.worker = Worker(config)
+        st.session_state.worker = Worker(st.session_state.robot)
 
     defaults = {
         "mt5_initialized": False,
@@ -67,16 +67,15 @@ def _render_sidebar():
     with st.sidebar:
         # Brand header — glassmorphism premium
         st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1.2rem 1rem; margin-bottom: 0.8rem;">
-            <div style="font-size: 2.2rem; line-height: 1; margin-bottom: 0.4rem;">🤖</div>
-            <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #667eea, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Trading Robot</div>
-            <div style="font-size: 0.6rem; opacity: 0.35; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.25rem;">v2.0 • Automated Trading System</div>
+        <div style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.03)); backdrop-filter: blur(10px); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 14px; padding: 1.2rem 1.1rem; margin-bottom: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.3rem; line-height: 1; margin-bottom: 0.5rem; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.5));">🤖</div>
+            <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Trading Robot</div>
+            <div style="font-size: 0.62rem; opacity: 0.45; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.3rem; font-weight: 600; color: #a5b4fc;">v2.0 • Automated Swarm System</div>
         </div>
         """, unsafe_allow_html=True)
 
         # Navigation
-        page_labels = ["📊 Dashboard", "📈 Charts", "💱 Trading", "⚙️ Settings",
-                       "📈 Backtest", "📜 Trade History", "ℹ️ About"]
+        page_labels = ["📊 Dashboard", "📈 Charts", "📊 Performance", "⚙️ Settings"]
 
         selected = st.radio(
             "Navigation", page_labels,
@@ -88,7 +87,7 @@ def _render_sidebar():
         render_auto_trade_controls(compact=True)
 
         # Quick actions
-        if st.button("🔄 Refresh Data", width='stretch'):
+        if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -156,23 +155,16 @@ def run():
     page = _render_sidebar()
 
     # Route to the appropriate page
-    from dashboard.pages import dashboard_page, charts_page, trading_page, \
-        settings_page, backtest_page, trade_history_page, about_page
+    from dashboard.pages import dashboard_page, charts_page, performance_page, settings_page
 
     if page == "📊 Dashboard":
         dashboard_page.render()
     elif page == "📈 Charts":
         charts_page.render()
-    elif page == "💱 Trading":
-        trading_page.render()
+    elif page == "📊 Performance":
+        performance_page.render()
     elif page == "⚙️ Settings":
         settings_page.render()
-    elif page == "📈 Backtest":
-        backtest_page.render()
-    elif page == "📜 Trade History":
-        trade_history_page.render()
-    elif page == "ℹ️ About":
-        about_page.render()
 
     # Non-blocking auto-refresh via st.rerun() — avoids full page reload
     if st.session_state.get("live_refresh"):

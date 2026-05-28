@@ -40,22 +40,24 @@ class ConfigManager:
 
     def __init__(self, db: Optional[Any] = None):
         self.config: Dict[str, Any] = {}
-        self._db = db
+        if db is None:
+            from src.persistence.database import get_db
+            db = get_db()
+        from src.repositories.settings_repo import SettingsRepository
+        self.repository = SettingsRepository(db)
         self.load()
 
     # ── Load ──────────────────────────────────────────────────
 
     def load(self) -> Dict[str, Any]:
         """Load config from MySQL settings table. Fails fast on DB error."""
-        if self._db is None:
-            from src.persistence.database import get_db
-            self._db = get_db()
         return self._load_from_db()
 
     def _load_from_db(self) -> Dict[str, Any]:
         """Load config from MySQL settings table. Seeds defaults first."""
-        self._db.seed_settings()
-        db_settings = self._db.get_all_settings()
+        self.repository.seed()
+        bot_config = self.repository.find_all()
+        db_settings = bot_config.raw
         if db_settings:
             self.config = deepcopy(db_settings)
             n_keys = sum(len(v) for v in db_settings.values())
@@ -69,12 +71,10 @@ class ConfigManager:
     def save(self) -> bool:
         """Persist current config back to the database."""
         try:
-            for section, keys in self.config.items():
-                if isinstance(keys, dict):
-                    for key_name, value in keys.items():
-                        self._db.set_setting(section, key_name, value)
-            logger.info("Config saved to DB")
-            return True
+            success = self.repository.set_many(self.config)
+            if success:
+                logger.info("Config saved to DB")
+            return success
         except Exception as e:
             logger.error(f"Failed to save config to DB: {e}")
             return False

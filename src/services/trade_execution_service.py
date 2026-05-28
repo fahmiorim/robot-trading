@@ -26,8 +26,8 @@ class TradeExecutionService:
         self.trade_manager = trade_manager
         self.rpc = rpc_manager
 
-        from src.trading.dca_manager import DCAManager
-        from src.trading.roi_manager import ROIManager
+        from src.services.trading.dca_manager import DCAManager
+        from src.services.trading.roi_manager import ROIManager
         self.dca_manager = DCAManager(config)
         self.roi_manager = ROIManager(config)
 

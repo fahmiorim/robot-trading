@@ -56,3 +56,12 @@ class AgentPipeline:
             'decision': decision,
             'regime': regime
         }
+
+
+def get_agent_signal(data: pd.DataFrame) -> int:
+    """Helper function to run agent pipeline and return signal."""
+    from src.analysis.regime import RegimeDetector
+    regime = RegimeDetector().detect_regime(data)
+    pipeline = AgentPipeline()
+    result = pipeline.run_pipeline(data, regime)
+    return result.get('decision', 0)

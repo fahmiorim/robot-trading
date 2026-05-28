@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from dashboard.helpers import ensure_mt5, refresh_robot, map_sig
-from dashboard.components import render_account_info, render_strategy_signals
+
 from src.configuration import TIMEFRAME_MAP
 from src.rpc.websocket import set_shared
 
@@ -64,7 +64,7 @@ def render():
                 config.save()
         with cc[3]:
             st.markdown("<br>", unsafe_allow_html=True)
-            fetch_now = st.button("Refresh Data", width='stretch', type="primary")
+            fetch_now = st.button("Refresh Data", use_container_width=True, type="primary")
             if fetch_now:
                 with st.spinner("Fetching..."):
                     try:
@@ -77,11 +77,7 @@ def render():
                     except Exception as e:
                         st.error(f"Fetch error: {e}")
 
-    # ── Account Info (reusable component) ──
-    st.subheader("Account Info")
-    with st.container(border=True):
-        st.markdown('', unsafe_allow_html=True)
-        render_account_info()
+
 
     # ── Price Chart ──
     st.subheader("Price Chart")
@@ -117,7 +113,7 @@ def render():
                               legend=dict(orientation="h", y=1.02, x=0.5, xanchor="center"),
                               margin=dict(l=50, r=20, t=30, b=50), hovermode="x unified",
                               template="plotly_dark", dragmode="zoom")
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
 
             qs = st.columns(5)
             last_close = chart_data["close"].iloc[-1]
@@ -159,7 +155,6 @@ def render():
                 set_shared("best_strategy", name)
                 st.markdown(f"### Best Strategy: **{name}**")
 
-            # Strategy signals (reusable component)
-            render_strategy_signals(robot, data)
+
         else:
             st.info("Fetch data to see market analysis")

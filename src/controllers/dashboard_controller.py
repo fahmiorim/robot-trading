@@ -61,13 +61,15 @@ class DashboardController:
     # ── Trade History ──
 
     def get_trade_history(self, limit: int = 500) -> List[Dict]:
-        return self.trade_repo.get_trade_history(limit=limit)
+        trades = self.trade_repo.find_all(limit=limit)
+        return [t.to_dict() for t in trades]
 
     def get_open_trades(self) -> List[Dict]:
-        return self.trade_repo.get_open_trades()
+        trades = self.trade_repo.find_open()
+        return [t.to_dict() for t in trades]
 
     def get_trade_summary(self, days: int = 7) -> Dict:
-        return self.trade_repo.get_trade_summary(days=days)
+        return self.trade_repo.summary(days=days)
 
     # ── Equity & Performance ──
 

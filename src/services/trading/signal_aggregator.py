@@ -62,7 +62,7 @@ class SignalAggregator:
 
             model = MLModel()
             ml_sig = 0
-            if model.load("models/latest_model.pkl"):
+            if model.load("trained_models/latest_model.pkl"):
                 pred = model.predict(data)
                 ml_sig = int(pred.item()) if hasattr(pred, "item") else int(pred[0])
 

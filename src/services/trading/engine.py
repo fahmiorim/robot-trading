@@ -15,7 +15,7 @@ Usage::
 from typing import Any, Dict, Optional
 
 from src.controllers.trading_controller import TradingController
-from src.trading.signal_aggregator import SignalAggregator
+from src.services.trading.signal_aggregator import SignalAggregator
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)

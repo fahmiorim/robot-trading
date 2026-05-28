@@ -30,18 +30,18 @@ def _render_compact(config):
     if st.session_state.auto_trading_enabled:
         cycles = st.session_state.robot.cycle_count
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); backdrop-filter: blur(10px); border: 1px solid rgba(239,68,68,0.3); border-radius: 14px; padding: 0.8rem 1rem; margin-bottom: 0.5rem;">
+        <div style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(15, 15, 26, 0.2)); backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 14px; padding: 0.8rem 1.1rem; margin-bottom: 0.8rem; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.08);">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="live-dot red"></span>
-                <span style="font-weight: 700; font-size: 0.85rem; color: #f87171;">AUTO TRADING ACTIVE</span>
+                <span style="font-weight: 800; font-size: 0.85rem; color: #f87171; letter-spacing: 0.02em;">AUTO TRADING ACTIVE</span>
             </div>
-            <div style="font-size: 0.7rem; opacity: 0.5; margin-top: 6px; display: flex; gap: 16px;">
-                <span>&#x1F504; Cycles: {cycles}</span>
-                <span>&#x26A1; Running</span>
+            <div style="font-size: 0.72rem; opacity: 0.6; margin-top: 8px; display: flex; gap: 16px; font-weight: 500;">
+                <span>🔄 Cycles: {cycles}</span>
+                <span>⚡ Running</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("⏹ STOP Auto Trading", width='stretch', type="primary"):
+        if st.button("⏹ STOP Auto Trading", use_container_width=True, type="primary"):
             st.session_state.worker.stop()
             config.set("general", "auto_trade", False)
             config.save()
@@ -51,12 +51,12 @@ def _render_compact(config):
             st.rerun()
     else:
         st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 0.8rem 1rem; margin-bottom: 0.5rem; opacity: 0.7;">
+        <div style="font-family: 'Outfit', sans-serif; background: rgba(255, 255, 255, 0.01); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 0.8rem 1.1rem; margin-bottom: 0.8rem; opacity: 0.7;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="live-dot" style="background: rgba(255,255,255,0.15); box-shadow: none; animation: none;"></span>
-                <span style="font-weight: 600; font-size: 0.85rem; opacity: 0.7;">Auto Trading OFF</span>
+                <span style="font-weight: 600; font-size: 0.85rem; opacity: 0.7; color: #ffffff;">Auto Trading OFF</span>
             </div>
-            <div style="font-size: 0.7rem; opacity: 0.45; margin-top: 4px;">Use Trading page to start</div>
+            <div style="font-size: 0.7rem; opacity: 0.45; margin-top: 6px; font-weight: 500;">Use Trading page to start</div>
         </div>
         """, unsafe_allow_html=True)
         auto_trade = config.get("general", "auto_trade")
@@ -101,7 +101,7 @@ def _render_full(config):
     at_row = st.columns([1, 1])
     with at_row[0]:
         if not st.session_state.auto_trading_enabled:
-            if st.button("▶️ START AUTO TRADING", type="primary", width='stretch'):
+            if st.button("▶️ START AUTO TRADING", type="primary", use_container_width=True):
                 if ensure_mt5():
                     st.session_state.worker.start()
                     st.session_state.config.set("general", "auto_trade", True)
@@ -114,7 +114,7 @@ def _render_full(config):
                 else:
                     st.error("MT5 not connected!")
         else:
-            if st.button("⏹ STOP AUTO TRADING", type="primary", width='stretch'):
+            if st.button("⏹ STOP AUTO TRADING", type="primary", use_container_width=True):
                 st.session_state.worker.stop()
                 st.session_state.config.set("general", "auto_trade", False)
                 st.session_state.config.save()

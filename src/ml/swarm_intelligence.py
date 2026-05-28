@@ -63,3 +63,10 @@ class SwarmIntelligence:
         for name, score in performance.items():
             if name in self.weights:
                 self.weights[name] *= (1 + score * 0.05)
+
+
+def get_swarm_signal(data: pd.DataFrame) -> int:
+    """Helper function to run swarm intelligence voting and return signal."""
+    swarm = SwarmIntelligence()
+    swarm.train_all(data)
+    return swarm.vote_signal(data)

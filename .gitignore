@@ -18,7 +18,7 @@ build/
 *.swo
 
 # Data & models
-models/*.pkl
+trained_models/*.pkl
 *.sqlite3
 
 # OS

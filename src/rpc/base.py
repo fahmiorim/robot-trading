@@ -168,8 +168,10 @@ class RPCManager:
 
     def _cmd_daily(self) -> str:
         try:
+            from src.repositories.trade_repo import TradeRepository
             db = __import__("src.persistence.database", fromlist=["get_db"]).get_db()
-            summary = db.get_trade_summary(days=1)
+            repo = TradeRepository(db)
+            summary = repo.summary(days=1)
         except Exception:
             summary = {}
         return (

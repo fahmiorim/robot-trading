@@ -7,7 +7,7 @@ Usage:
 """
 import sys
 import time
-from src.trading.engine import TradingBot as AIRobot
+from src.services.trading.engine import TradingBot as AIRobot
 from src.configuration.manager import ConfigManager
 from src.persistence.database import DatabaseManager
 from src.rpc.telegram import TelegramRPC as TelegramNotifier

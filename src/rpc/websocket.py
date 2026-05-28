@@ -142,7 +142,7 @@ class WebSocketRPC(IRPC):
         self.clients -= dead
 
 
-def start_data_pusher(ws: WebSocketRPC, exchange: IExchange,
+def start_data_pusher(ws: WebSocketRPC, bot: Any,
                        config: ConfigManager) -> None:
     """Start background thread that polls the exchange and broadcasts."""
     def _push():
@@ -150,12 +150,86 @@ def start_data_pusher(ws: WebSocketRPC, exchange: IExchange,
         while True:
             try:
                 symbol = config.get("general", "symbol")
-                ticker = exchange.fetch_ticker(symbol)
-                balance = exchange.get_balance()
-                positions = exchange.get_open_positions(symbol)
+                exchange = getattr(bot, "exchange", None)
+                if not exchange:
+                    time.sleep(1.5)
+                    continue
+
+                # Use bot.paper_positions if paper_trading is enabled, else exchange positions
+                paper_trading = getattr(bot, "paper_trading", True)
+                if paper_trading:
+                    try:
+                        bot.update_paper_positions()
+                    except Exception:
+                        pass
+                    positions = getattr(bot, "paper_positions", [])
+                    # Account metrics for paper trading
+                    account_balance = getattr(bot, "paper_balance", 0.0)
+                    total_pnl = sum(p.get("profit", 0) for p in positions) if positions else 0.0
+                    account_equity = account_balance + total_pnl
+                    free_margin = account_equity
+                    margin_level = 100.0
+                    mt5_connected = exchange.is_connected()
+                    ticker = {}
+                    try:
+                        ticker = exchange.fetch_ticker(symbol) or {}
+                    except Exception:
+                        pass
+                else:
+                    ticker = exchange.fetch_ticker(symbol) or {}
+                    balance = exchange.get_balance() or {}
+                    positions = exchange.get_open_positions(symbol) or []
+                    account_balance = balance.get("balance", 0.0)
+                    account_equity = balance.get("equity", 0.0)
+                    free_margin = balance.get("free_margin", 0.0)
+                    margin_level = balance.get("margin_level", 0.0)
+                    mt5_connected = exchange.is_connected()
+
                 regime = get_shared("regime", "unknown")
                 auto = get_shared("auto_trading", False)
                 strategy = get_shared("best_strategy", "N/A")
+                cycles = getattr(bot, "cycle_count", 0)
+
+                # Fetch candles to compute signals
+                candles = None
+                try:
+                    candles = bot.fetch_data(data_count=100)
+                except Exception:
+                    pass
+
+                sig_strat = 0
+                sig_ml = 0
+                sig_agent = 0
+                sig_swarm = 0
+                if candles is not None and not candles.empty:
+                    try:
+                        sig_strat = bot.get_signal(candles)
+                        sig_ml = bot.get_signal(candles, use_ml=True)
+                        sig_agent = bot.get_signal(candles, use_agent=True)
+                        sig_swarm = bot.get_signal(candles, use_swarm=True)
+                    except Exception:
+                        pass
+
+                # Risk summary
+                risk_summary = {}
+                try:
+                    risk_summary = bot.risk.get_status_summary()
+                except Exception:
+                    pass
+
+                # Format positions for JS ease-of-use
+                formatted_positions = []
+                for p in positions:
+                    formatted_positions.append({
+                        "ticket": p.get("ticket"),
+                        "symbol": p.get("symbol"),
+                        "type": p.get("type", p.get("action", "")),
+                        "volume": p.get("volume"),
+                        "price": p.get("price"),
+                        "sl": p.get("sl"),
+                        "tp": p.get("tp"),
+                        "profit": p.get("profit", 0)
+                    })
 
                 data = {
                     "type": "market_data",
@@ -168,23 +242,37 @@ def start_data_pusher(ws: WebSocketRPC, exchange: IExchange,
                         if ticker.get("ask") and ticker.get("bid") else None,
                     },
                     "account": {
-                        "balance": balance.get("balance"),
-                        "equity": balance.get("equity"),
-                        "free_margin": balance.get("free_margin"),
-                        "margin_level": balance.get("margin_level"),
+                        "balance": account_balance,
+                        "equity": account_equity,
+                        "free_margin": free_margin,
+                        "margin_level": margin_level,
                     },
-                    "positions": {"count": len(positions)},
+                    "positions": {
+                        "count": len(positions),
+                        "list": formatted_positions
+                    },
                     "status": {
                         "auto_trading": auto,
                         "regime": regime.upper(),
                         "best_strategy": strategy,
-                        "mt5_connected": exchange.is_connected(),
+                        "mt5_connected": mt5_connected,
+                        "cycles": cycles,
+                        "timeframe": config.get("general", "timeframe"),
+                        "paper_trading": paper_trading
                     },
+                    "signals": {
+                        "strategy": sig_strat,
+                        "ml": sig_ml,
+                        "agent": sig_agent,
+                        "swarm": sig_swarm
+                    },
+                    "risk": risk_summary
                 }
                 ws.broadcast(data)
                 err_count = 0
-            except Exception:
+            except Exception as e:
                 err_count += 1
+                logger.error(f"WS pusher error: {e}")
                 if err_count > 10:
                     time.sleep(10)
             time.sleep(1.5)

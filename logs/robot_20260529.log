@@ -14577,3 +14577,459 @@ Cycle #410
 2026-05-29 06:12:42 | INFO     | src.services.strategy_service |   RSI: return=0.01%, trades=12, wr=50.0%
 2026-05-29 06:12:43 | INFO     | src.services.strategy_service |   MACD: return=-0.34%, trades=228, wr=25.4%
 2026-05-29 06:12:43 | INFO     | src.services.strategy_service |   MACD: return=-0.33%, trades=228, wr=27.2%
+2026-05-29 06:26:13 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:26:13 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:26:13 | INFO     | src.ml.model | ML model loaded from models/latest_model.pkl
+2026-05-29 06:26:13 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:26:13 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:26:13 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:26:13 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:26:13 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:26:13 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:26:13 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8765
+2026-05-29 06:26:13 | INFO     | src.trading.pairlist | Pairlist refreshed: 0 pairs
+2026-05-29 06:26:13 | INFO     | src.trading.pairlist | Pairlist refreshed: 0 pairs
+2026-05-29 06:29:09 | INFO     | main | ============================================================
+2026-05-29 06:29:09 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:29:09 | INFO     | main | ============================================================
+2026-05-29 06:29:09 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:29:09 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:29:09 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:29:09 | INFO     | src.ml.model | ML model loaded from models/latest_model.pkl
+2026-05-29 06:29:09 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:29:09 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:29:09 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:29:09 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:29:09 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:29:09 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:29:09 | INFO     | src.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:29:09 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:29:09 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:29:09 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8766
+2026-05-29 06:29:09 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:29:09 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:29:09 | INFO     | src.data.provider | Incremental: 17 new candles
+2026-05-29 06:29:09 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:29:09 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:29:09 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=30.0%
+2026-05-29 06:29:10 | INFO     | src.services.strategy_service |   MA_Crossover: return=0.01%, trades=92, wr=37.0%
+2026-05-29 06:29:10 | INFO     | src.services.strategy_service |   RSI: return=-0.02%, trades=64, wr=59.4%
+2026-05-29 06:29:10 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=224, wr=25.0%
+2026-05-29 06:29:11 | INFO     | src.services.strategy_service |   Bollinger: return=-0.12%, trades=166, wr=49.4%
+2026-05-29 06:29:11 | INFO     | src.services.strategy_service | Regime: RANGING
+2026-05-29 06:29:11 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: 0.00)
+2026-05-29 06:29:11 | INFO     | main |     Detected market regime: RANGING
+2026-05-29 06:29:11 | INFO     | main |     MA_Crossover                  0.01%      92 trades, win_rate= 37.0%, max_dd= 0.04%
+2026-05-29 06:29:11 | INFO     | main |     RSI                          -0.02%      64 trades, win_rate= 59.4%, max_dd= 0.05%
+2026-05-29 06:29:11 | INFO     | main |     Breakout                     -0.03%      60 trades, win_rate= 30.0%, max_dd= 0.05%
+2026-05-29 06:29:11 | INFO     | main |     Bollinger                    -0.12%     166 trades, win_rate= 49.4%, max_dd= 0.12%
+2026-05-29 06:29:11 | INFO     | main |     MACD                         -0.14%     224 trades, win_rate= 25.0%, max_dd= 0.15%
+2026-05-29 06:29:11 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:29:11 | INFO     | main | [3] Training ML model...
+2026-05-29 06:29:11 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:29:11 | INFO     | src.ml.model | ML model trained: accuracy=99.75%
+2026-05-29 06:29:11 | INFO     | src.ml.model | ML model saved to models/latest_model.pkl
+2026-05-29 06:29:11 | INFO     | src.ml.trainer | ML training complete: accuracy=99.75%
+2026-05-29 06:29:11 | INFO     | main |     ML Model accuracy: 99.75%
+2026-05-29 06:29:11 | INFO     | main | [4] Current signals:
+2026-05-29 06:29:11 | INFO     | main |     strategy  : SELL
+2026-05-29 06:29:11 | INFO     | main |     ml        : HOLD
+2026-05-29 06:29:11 | INFO     | main |     agent     : HOLD
+2026-05-29 06:29:11 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:29:11 | INFO     | main |     Consensus: HOLD (buy_ratio=0.0%, sell_ratio=25.0%)
+2026-05-29 06:29:11 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:29:11 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:29:11 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:29:11 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:29:11 | INFO     | main | ============================================================
+2026-05-29 06:29:11 | INFO     | main |   Analysis complete!
+2026-05-29 06:29:11 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:29:11 | INFO     | main | ============================================================
+2026-05-29 06:29:11 | INFO     | src.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:29:11 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:29:11 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:29:11 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:29:11 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:29:11 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:29:11 | INFO     | src.trading.engine | TradingBot shutdown complete
+2026-05-29 06:33:29 | INFO     | main | ============================================================
+2026-05-29 06:33:29 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:33:29 | INFO     | main | ============================================================
+2026-05-29 06:33:29 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:33:29 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:33:29 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:33:29 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:33:29 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:33:29 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:33:29 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:33:29 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:33:29 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:33:29 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:33:29 | INFO     | src.services.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:33:29 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:33:29 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:33:29 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8766
+2026-05-29 06:33:29 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:33:29 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:33:29 | INFO     | src.data.provider | Incremental: 4 new candles
+2026-05-29 06:33:29 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:33:29 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:33:29 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=30.0%
+2026-05-29 06:33:30 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.00%, trades=96, wr=35.4%
+2026-05-29 06:33:30 | INFO     | src.services.strategy_service |   RSI: return=-0.02%, trades=62, wr=58.1%
+2026-05-29 06:33:30 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=228, wr=24.6%
+2026-05-29 06:33:31 | INFO     | src.services.strategy_service |   Bollinger: return=-0.10%, trades=166, wr=53.0%
+2026-05-29 06:33:31 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:33:31 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:33:31 | INFO     | main |     Detected market regime: CHOPPY
+2026-05-29 06:33:31 | INFO     | main |     MA_Crossover                 -0.00%      96 trades, win_rate= 35.4%, max_dd= 0.05%
+2026-05-29 06:33:31 | INFO     | main |     RSI                          -0.02%      62 trades, win_rate= 58.1%, max_dd= 0.05%
+2026-05-29 06:33:31 | INFO     | main |     Breakout                     -0.03%      60 trades, win_rate= 30.0%, max_dd= 0.06%
+2026-05-29 06:33:31 | INFO     | main |     Bollinger                    -0.10%     166 trades, win_rate= 53.0%, max_dd= 0.11%
+2026-05-29 06:33:31 | INFO     | main |     MACD                         -0.14%     228 trades, win_rate= 24.6%, max_dd= 0.16%
+2026-05-29 06:33:31 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:33:31 | INFO     | main | [3] Training ML model...
+2026-05-29 06:33:31 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:33:31 | INFO     | src.ml.model | ML model trained: accuracy=100.00%
+2026-05-29 06:33:31 | INFO     | src.ml.model | ML model saved to trained_models/latest_model.pkl
+2026-05-29 06:33:31 | INFO     | src.ml.trainer | ML training complete: accuracy=100.00%
+2026-05-29 06:33:31 | INFO     | main |     ML Model accuracy: 100.00%
+2026-05-29 06:33:31 | INFO     | main | [4] Current signals:
+2026-05-29 06:33:31 | INFO     | main |     strategy  : BUY
+2026-05-29 06:33:31 | INFO     | main |     ml        : HOLD
+2026-05-29 06:33:31 | INFO     | main |     agent     : HOLD
+2026-05-29 06:33:31 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:33:31 | INFO     | main |     Consensus: HOLD (buy_ratio=25.0%, sell_ratio=0.0%)
+2026-05-29 06:33:31 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:33:31 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:33:31 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:33:31 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:33:31 | INFO     | main | ============================================================
+2026-05-29 06:33:31 | INFO     | main |   Analysis complete!
+2026-05-29 06:33:31 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:33:31 | INFO     | main | ============================================================
+2026-05-29 06:33:31 | INFO     | src.services.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:33:31 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:33:31 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:33:31 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:33:31 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:33:31 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:33:31 | INFO     | src.services.trading.engine | TradingBot shutdown complete
+2026-05-29 06:35:54 | INFO     | main | ============================================================
+2026-05-29 06:35:54 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:35:54 | INFO     | main | ============================================================
+2026-05-29 06:35:54 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:35:54 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:35:54 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:35:54 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:35:54 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:35:54 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:35:54 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:35:54 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:35:54 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:35:54 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:35:54 | INFO     | src.services.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:35:54 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:35:54 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:35:54 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8766
+2026-05-29 06:35:55 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:35:55 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:35:55 | INFO     | src.data.provider | Incremental: 2 new candles
+2026-05-29 06:35:55 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:35:55 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:35:55 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=30.0%
+2026-05-29 06:35:55 | INFO     | src.services.strategy_service |   MA_Crossover: return=0.00%, trades=94, wr=42.5%
+2026-05-29 06:35:55 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=51.6%
+2026-05-29 06:35:56 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=222, wr=24.3%
+2026-05-29 06:35:56 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=50.0%
+2026-05-29 06:35:56 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:35:56 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: 0.00)
+2026-05-29 06:35:56 | INFO     | main |     Detected market regime: CHOPPY
+2026-05-29 06:35:56 | INFO     | main |     MA_Crossover                  0.00%      94 trades, win_rate= 42.5%, max_dd= 0.04%
+2026-05-29 06:35:56 | INFO     | main |     Breakout                     -0.03%      60 trades, win_rate= 30.0%, max_dd= 0.06%
+2026-05-29 06:35:56 | INFO     | main |     RSI                          -0.04%      62 trades, win_rate= 51.6%, max_dd= 0.05%
+2026-05-29 06:35:56 | INFO     | main |     Bollinger                    -0.11%     164 trades, win_rate= 50.0%, max_dd= 0.12%
+2026-05-29 06:35:56 | INFO     | main |     MACD                         -0.14%     222 trades, win_rate= 24.3%, max_dd= 0.16%
+2026-05-29 06:35:56 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:35:56 | INFO     | main | [3] Training ML model...
+2026-05-29 06:35:56 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:35:56 | INFO     | src.ml.model | ML model trained: accuracy=100.00%
+2026-05-29 06:35:56 | INFO     | src.ml.model | ML model saved to trained_models/latest_model.pkl
+2026-05-29 06:35:56 | INFO     | src.ml.trainer | ML training complete: accuracy=100.00%
+2026-05-29 06:35:56 | INFO     | main |     ML Model accuracy: 100.00%
+2026-05-29 06:35:56 | INFO     | main | [4] Current signals:
+2026-05-29 06:35:56 | INFO     | main |     strategy  : BUY
+2026-05-29 06:35:56 | INFO     | main |     ml        : HOLD
+2026-05-29 06:35:56 | INFO     | main |     agent     : HOLD
+2026-05-29 06:35:56 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:35:56 | INFO     | main |     Consensus: HOLD (buy_ratio=25.0%, sell_ratio=0.0%)
+2026-05-29 06:35:56 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:35:56 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:35:56 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:35:56 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:35:56 | INFO     | main | ============================================================
+2026-05-29 06:35:56 | INFO     | main |   Analysis complete!
+2026-05-29 06:35:56 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:35:56 | INFO     | main | ============================================================
+2026-05-29 06:35:56 | INFO     | src.services.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:35:56 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:35:56 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:35:56 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:35:56 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:35:56 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:35:56 | INFO     | src.services.trading.engine | TradingBot shutdown complete
+2026-05-29 06:36:55 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:36:55 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:36:55 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:36:55 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:36:55 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:36:55 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:36:55 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:36:55 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:36:55 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:36:55 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8766
+2026-05-29 06:36:55 | INFO     | src.services.trading.pairlist | Pairlist refreshed: 1 pairs
+2026-05-29 06:37:03 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:37:03 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:37:03 | INFO     | src.data.provider | Incremental: 2 new candles
+2026-05-29 06:37:03 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=26.7%
+2026-05-29 06:37:04 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.00%, trades=94, wr=38.3%
+2026-05-29 06:37:04 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=61.3%
+2026-05-29 06:37:04 | INFO     | src.services.strategy_service |   MACD: return=-0.13%, trades=224, wr=25.9%
+2026-05-29 06:37:05 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=50.0%
+2026-05-29 06:37:05 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:37:05 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:38:05 | INFO     | main | ============================================================
+2026-05-29 06:38:05 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:38:05 | INFO     | main | ============================================================
+2026-05-29 06:38:05 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:38:06 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:38:06 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:38:06 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:38:06 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:38:06 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:38:06 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:38:06 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:38:06 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:38:06 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:38:06 | INFO     | src.services.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:38:06 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:38:06 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:38:06 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8767
+2026-05-29 06:38:06 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:38:06 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:38:06 | INFO     | src.data.provider | Incremental: 1 new candles
+2026-05-29 06:38:06 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:38:06 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:38:06 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=33.3%
+2026-05-29 06:38:06 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.00%, trades=94, wr=40.4%
+2026-05-29 06:38:07 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=60, wr=53.3%
+2026-05-29 06:38:07 | INFO     | src.services.strategy_service |   MACD: return=-0.14%, trades=222, wr=27.0%
+2026-05-29 06:38:07 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=53.7%
+2026-05-29 06:38:07 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:38:07 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:38:07 | INFO     | main |     Detected market regime: CHOPPY
+2026-05-29 06:38:07 | INFO     | main |     MA_Crossover                 -0.00%      94 trades, win_rate= 40.4%, max_dd= 0.05%
+2026-05-29 06:38:07 | INFO     | main |     Breakout                     -0.03%      60 trades, win_rate= 33.3%, max_dd= 0.06%
+2026-05-29 06:38:07 | INFO     | main |     RSI                          -0.04%      60 trades, win_rate= 53.3%, max_dd= 0.05%
+2026-05-29 06:38:07 | INFO     | main |     Bollinger                    -0.11%     164 trades, win_rate= 53.7%, max_dd= 0.12%
+2026-05-29 06:38:07 | INFO     | main |     MACD                         -0.14%     222 trades, win_rate= 27.0%, max_dd= 0.15%
+2026-05-29 06:38:07 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:38:07 | INFO     | main | [3] Training ML model...
+2026-05-29 06:38:07 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:38:07 | INFO     | src.ml.model | ML model trained: accuracy=99.75%
+2026-05-29 06:38:07 | INFO     | src.ml.model | ML model saved to trained_models/latest_model.pkl
+2026-05-29 06:38:07 | INFO     | src.ml.trainer | ML training complete: accuracy=99.75%
+2026-05-29 06:38:07 | INFO     | main |     ML Model accuracy: 99.75%
+2026-05-29 06:38:07 | INFO     | main | [4] Current signals:
+2026-05-29 06:38:07 | INFO     | main |     strategy  : BUY
+2026-05-29 06:38:07 | INFO     | main |     ml        : HOLD
+2026-05-29 06:38:07 | INFO     | main |     agent     : HOLD
+2026-05-29 06:38:07 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:38:07 | INFO     | main |     Consensus: HOLD (buy_ratio=25.0%, sell_ratio=0.0%)
+2026-05-29 06:38:07 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:38:07 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:38:07 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:38:07 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:38:07 | INFO     | main | ============================================================
+2026-05-29 06:38:07 | INFO     | main |   Analysis complete!
+2026-05-29 06:38:07 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:38:07 | INFO     | main | ============================================================
+2026-05-29 06:38:07 | INFO     | src.services.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:38:07 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:38:07 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:38:07 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:38:07 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:38:07 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:38:07 | INFO     | src.services.trading.engine | TradingBot shutdown complete
+2026-05-29 06:39:12 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:39:12 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:39:12 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:39:12 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:39:12 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:39:12 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:39:12 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:39:12 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:39:12 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:39:12 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8767
+2026-05-29 06:39:18 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:39:18 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:39:18 | INFO     | src.data.provider | Incremental: 1 new candles
+2026-05-29 06:39:19 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=26.7%
+2026-05-29 06:39:19 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.01%, trades=96, wr=39.6%
+2026-05-29 06:39:19 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=61.3%
+2026-05-29 06:39:20 | INFO     | src.services.strategy_service |   MACD: return=-0.13%, trades=222, wr=25.2%
+2026-05-29 06:39:20 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=48.8%
+2026-05-29 06:39:20 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:39:20 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:39:26 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=60, wr=26.7%
+2026-05-29 06:39:26 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.01%, trades=96, wr=39.6%
+2026-05-29 06:39:27 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=62, wr=61.3%
+2026-05-29 06:39:27 | INFO     | src.services.strategy_service |   MACD: return=-0.13%, trades=222, wr=25.2%
+2026-05-29 06:39:27 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=48.8%
+2026-05-29 06:39:27 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:39:27 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:39:40 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:39:40 | INFO     | dashboard.helpers | Fetched 25 symbols from MT5
+2026-05-29 06:39:40 | INFO     | dashboard.helpers | Fetched 25 symbols from MT5
+2026-05-29 06:40:49 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:41:03 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:41:03 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:41:08 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:41:08 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:41:33 | INFO     | main | ============================================================
+2026-05-29 06:41:33 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:41:33 | INFO     | main | ============================================================
+2026-05-29 06:41:33 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:41:33 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:41:33 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:41:33 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:41:33 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:41:33 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:41:33 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:41:33 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:41:33 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:41:33 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:41:33 | INFO     | src.services.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:41:33 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:41:33 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:41:33 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8768
+2026-05-29 06:41:33 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:41:33 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:41:33 | INFO     | src.data.provider | Incremental: 2 new candles
+2026-05-29 06:41:33 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:41:33 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:41:33 | INFO     | src.services.strategy_service |   Breakout: return=-0.04%, trades=62, wr=22.6%
+2026-05-29 06:41:34 | INFO     | src.services.strategy_service |   MA_Crossover: return=0.00%, trades=100, wr=36.0%
+2026-05-29 06:41:34 | INFO     | src.services.strategy_service |   RSI: return=-0.03%, trades=60, wr=53.3%
+2026-05-29 06:41:34 | INFO     | src.services.strategy_service |   MACD: return=-0.12%, trades=224, wr=26.8%
+2026-05-29 06:41:35 | INFO     | src.services.strategy_service |   Bollinger: return=-0.11%, trades=164, wr=50.0%
+2026-05-29 06:41:35 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:41:35 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: 0.00)
+2026-05-29 06:41:35 | INFO     | main |     Detected market regime: CHOPPY
+2026-05-29 06:41:35 | INFO     | main |     MA_Crossover                  0.00%     100 trades, win_rate= 36.0%, max_dd= 0.04%
+2026-05-29 06:41:35 | INFO     | main |     RSI                          -0.03%      60 trades, win_rate= 53.3%, max_dd= 0.04%
+2026-05-29 06:41:35 | INFO     | main |     Breakout                     -0.04%      62 trades, win_rate= 22.6%, max_dd= 0.06%
+2026-05-29 06:41:35 | INFO     | main |     Bollinger                    -0.11%     164 trades, win_rate= 50.0%, max_dd= 0.11%
+2026-05-29 06:41:35 | INFO     | main |     MACD                         -0.12%     224 trades, win_rate= 26.8%, max_dd= 0.15%
+2026-05-29 06:41:35 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:41:35 | INFO     | main | [3] Training ML model...
+2026-05-29 06:41:35 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:41:35 | INFO     | src.ml.model | ML model trained: accuracy=99.50%
+2026-05-29 06:41:35 | INFO     | src.ml.model | ML model saved to trained_models/latest_model.pkl
+2026-05-29 06:41:35 | INFO     | src.ml.trainer | ML training complete: accuracy=99.50%
+2026-05-29 06:41:35 | INFO     | main |     ML Model accuracy: 99.50%
+2026-05-29 06:41:35 | INFO     | main | [4] Current signals:
+2026-05-29 06:41:35 | INFO     | main |     strategy  : SELL
+2026-05-29 06:41:35 | INFO     | main |     ml        : HOLD
+2026-05-29 06:41:35 | INFO     | main |     agent     : HOLD
+2026-05-29 06:41:35 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:41:35 | INFO     | main |     Consensus: HOLD (buy_ratio=0.0%, sell_ratio=25.0%)
+2026-05-29 06:41:35 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:41:35 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:41:35 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:41:35 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:41:35 | INFO     | main | ============================================================
+2026-05-29 06:41:35 | INFO     | main |   Analysis complete!
+2026-05-29 06:41:35 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:41:35 | INFO     | main | ============================================================
+2026-05-29 06:41:35 | INFO     | src.services.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:41:35 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:41:35 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:41:35 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:41:35 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:41:35 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:41:35 | INFO     | src.services.trading.engine | TradingBot shutdown complete
+2026-05-29 06:43:13 | INFO     | main | ============================================================
+2026-05-29 06:43:13 | INFO     | main |   AI TRADING ROBOT - MULTI STRATEGY SYSTEM
+2026-05-29 06:43:13 | INFO     | main | ============================================================
+2026-05-29 06:43:13 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:43:13 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:43:13 | INFO     | src.configuration.manager | Config validation passed
+2026-05-29 06:43:13 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:43:13 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:43:13 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:43:13 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:43:13 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:43:13 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:43:13 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:43:13 | INFO     | src.services.trading.engine | TradingBot (wrapper) ready — delegating to controller
+2026-05-29 06:43:13 | INFO     | main | [1] Fetching market data (XAUUSD)...
+2026-05-29 06:43:13 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:43:13 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8768
+2026-05-29 06:43:13 | INFO     | src.exchange.mt5 | Initialising MT5 connection...
+2026-05-29 06:43:13 | INFO     | src.exchange.mt5 | MT5 initialised, Market Watch enabled for XAUUSD
+2026-05-29 06:43:13 | INFO     | src.data.provider | Incremental: 2 new candles
+2026-05-29 06:43:13 | INFO     | main |     Loaded 2000 candles
+2026-05-29 06:43:13 | INFO     | main | [2] Running backtest on all strategies...
+2026-05-29 06:43:13 | INFO     | src.services.strategy_service |   Breakout: return=-0.03%, trades=62, wr=22.6%
+2026-05-29 06:43:13 | INFO     | src.services.strategy_service |   MA_Crossover: return=-0.00%, trades=100, wr=38.0%
+2026-05-29 06:43:14 | INFO     | src.services.strategy_service |   RSI: return=-0.04%, trades=60, wr=53.3%
+2026-05-29 06:43:14 | INFO     | src.services.strategy_service |   MACD: return=-0.13%, trades=226, wr=25.7%
+2026-05-29 06:43:14 | INFO     | src.services.strategy_service |   Bollinger: return=-0.10%, trades=164, wr=53.7%
+2026-05-29 06:43:14 | INFO     | src.services.strategy_service | Regime: CHOPPY
+2026-05-29 06:43:14 | INFO     | src.services.strategy_service | Best strategy: MA_Crossover (weighted: -0.00)
+2026-05-29 06:43:14 | INFO     | main |     Detected market regime: CHOPPY
+2026-05-29 06:43:14 | INFO     | main |     MA_Crossover                 -0.00%     100 trades, win_rate= 38.0%, max_dd= 0.04%
+2026-05-29 06:43:14 | INFO     | main |     Breakout                     -0.03%      62 trades, win_rate= 22.6%, max_dd= 0.06%
+2026-05-29 06:43:14 | INFO     | main |     RSI                          -0.04%      60 trades, win_rate= 53.3%, max_dd= 0.05%
+2026-05-29 06:43:14 | INFO     | main |     Bollinger                    -0.10%     164 trades, win_rate= 53.7%, max_dd= 0.10%
+2026-05-29 06:43:14 | INFO     | main |     MACD                         -0.13%     226 trades, win_rate= 25.7%, max_dd= 0.16%
+2026-05-29 06:43:14 | INFO     | main |     Best strategy: MACrossoverStrategy
+2026-05-29 06:43:14 | INFO     | main | [3] Training ML model...
+2026-05-29 06:43:14 | INFO     | src.ml.trainer | Training ML model...
+2026-05-29 06:43:15 | INFO     | src.ml.model | ML model trained: accuracy=99.75%
+2026-05-29 06:43:15 | INFO     | src.ml.model | ML model saved to trained_models/latest_model.pkl
+2026-05-29 06:43:15 | INFO     | src.ml.trainer | ML training complete: accuracy=99.75%
+2026-05-29 06:43:15 | INFO     | main |     ML Model accuracy: 99.75%
+2026-05-29 06:43:15 | INFO     | main | [4] Current signals:
+2026-05-29 06:43:15 | INFO     | main |     strategy  : SELL
+2026-05-29 06:43:15 | INFO     | main |     ml        : HOLD
+2026-05-29 06:43:15 | INFO     | main |     agent     : HOLD
+2026-05-29 06:43:15 | INFO     | main |     swarm     : HOLD
+2026-05-29 06:43:15 | INFO     | main |     Consensus: HOLD (buy_ratio=0.0%, sell_ratio=25.0%)
+2026-05-29 06:43:15 | INFO     | main |     Consensus thresholds: buy>=30%, sell>=30%
+2026-05-29 06:43:15 | INFO     | main | [5] Connection: connected=True
+2026-05-29 06:43:15 | INFO     | main | [6] Risk: DD=0.00%, daily_loss=0.00%, can_trade=True
+2026-05-29 06:43:15 | INFO     | main | [7] Auto-trading: enabled=False
+2026-05-29 06:43:15 | INFO     | main | ============================================================
+2026-05-29 06:43:15 | INFO     | main |   Analysis complete!
+2026-05-29 06:43:15 | INFO     | main |   Run: streamlit run dashboard.py
+2026-05-29 06:43:15 | INFO     | main | ============================================================
+2026-05-29 06:43:15 | INFO     | src.services.trading.engine | Shutting down TradingBot (wrapper)...
+2026-05-29 06:43:15 | INFO     | src.controllers.trading_controller | Shutting down controller...
+2026-05-29 06:43:15 | INFO     | src.exchange.mt5 | Shutting down MT5...
+2026-05-29 06:43:15 | INFO     | src.exchange.mt5 | MT5 shutdown complete
+2026-05-29 06:43:15 | ERROR    | src.rpc.websocket | WS loop error: Event loop stopped before Future completed.
+2026-05-29 06:43:15 | INFO     | src.controllers.trading_controller | Controller shutdown complete
+2026-05-29 06:43:15 | INFO     | src.services.trading.engine | TradingBot shutdown complete
+2026-05-29 06:43:34 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:43:34 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:43:34 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:43:34 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:43:34 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:43:34 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:43:34 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:43:34 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:43:34 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:43:34 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8768

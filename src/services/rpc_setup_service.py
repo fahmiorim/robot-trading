@@ -76,8 +76,7 @@ class RPCSetupService:
     def _setup_websocket(self, bot: Any) -> None:
         """Initialise WebSocket RPC backend and data pusher."""
         self.ws = WebSocketRPC()
-        if hasattr(bot, 'exchange'):
-            start_data_pusher(self.ws, bot.exchange, self.config)
+        start_data_pusher(self.ws, bot, self.config)
         self.ws.start()
         self.rpc.register(self.ws)
         logger.info("WebSocket RPC started on ws://localhost:8765")

@@ -5,7 +5,7 @@ import json
 import os
 
 class AutoresearchLoop:
-    def __init__(self, history_file: str = "models/performance_history.json"):
+    def __init__(self, history_file: str = "trained_models/performance_history.json"):
         self.history_file = history_file
         self.performance_history = []
         self._load_history()

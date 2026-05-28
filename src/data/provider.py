@@ -17,7 +17,6 @@ import pandas as pd
 
 from src.utils.exceptions import DataFetchError
 from src.exchange.base import IExchange
-from src.persistence.database import get_db
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,12 +35,19 @@ class DataProvider:
     """
 
     def __init__(self, exchange: IExchange, symbol: str = "XAUUSD",
-                 timeframe: str = "TIMEFRAME_M15", default_count: int = 2000):
+                 timeframe: str = "TIMEFRAME_M15", default_count: int = 2000,
+                 db: Optional[Any] = None):
         self.exchange = exchange
         self.symbol = symbol
         self.timeframe = timeframe
         self.default_count = default_count
         self._last_data: Optional[pd.DataFrame] = None
+
+        if db is None:
+            from src.persistence.database import get_db
+            db = get_db()
+        from src.repositories.market_data_repo import MarketDataRepository
+        self.repository = MarketDataRepository(db)
 
     # ── Public API ────────────────────────────────────────────
 
@@ -122,8 +128,7 @@ class DataProvider:
 
     def _load_from_db(self, count: int) -> Optional[pd.DataFrame]:
         try:
-            db = get_db()
-            df = db.load_market_data(self.symbol, self.timeframe, limit=count)
+            df = self.repository.load(self.symbol, self.timeframe, limit=count)
             if df is not None and len(df) > 0:
                 logger.debug(f"DB cache: {len(df)} candles for {self.symbol}")
                 return df
@@ -150,7 +155,7 @@ class DataProvider:
 
                     # Save new candles to DB
                     try:
-                        get_db().save_market_data(self.symbol, self.timeframe, new)
+                        self.repository.save(self.symbol, self.timeframe, new)
                     except Exception:
                         pass
         except Exception as e:
@@ -171,7 +176,7 @@ class DataProvider:
 
         # Save to DB
         try:
-            get_db().save_market_data(self.symbol, self.timeframe, df)
+            self.repository.save(self.symbol, self.timeframe, df)
         except Exception as e:
             logger.warning(f"Failed to save market data to DB: {e}")
 
