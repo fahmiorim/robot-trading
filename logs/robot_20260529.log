@@ -15053,3 +15053,13 @@ Cycle #410
 2026-05-29 06:46:39 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
 2026-05-29 06:46:39 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
 2026-05-29 06:46:39 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8770
+2026-05-29 06:47:50 | INFO     | src.persistence.database | MySQL connection established
+2026-05-29 06:47:50 | INFO     | src.configuration.manager | Config loaded from DB (115 keys)
+2026-05-29 06:47:50 | INFO     | src.ml.model | ML model loaded from trained_models/latest_model.pkl
+2026-05-29 06:47:50 | INFO     | src.ml.trainer | Loaded pre-trained ML model from disk
+2026-05-29 06:47:50 | INFO     | src.services.rpc_setup_service | Telegram RPC not configured, skipping
+2026-05-29 06:47:50 | INFO     | src.rpc.websocket | WS pusher started (every 1.5s)
+2026-05-29 06:47:50 | INFO     | src.rpc.websocket | WS server starting on ws://localhost:8765
+2026-05-29 06:47:50 | INFO     | src.services.rpc_setup_service | WebSocket RPC started on ws://localhost:8765
+2026-05-29 06:47:50 | INFO     | src.controllers.trading_controller | Controller ready: XAUUSD/TIMEFRAME_M1, paper=False, strategies=['Breakout', 'MA_Crossover', 'RSI', 'MACD', 'Bollinger']
+2026-05-29 06:47:50 | INFO     | src.rpc.websocket | WS ready on ws://localhost:8771

@@ -26,7 +26,6 @@ from src.rpc.websocket import set_shared
 
 from dashboard.styles import inject_css
 from dashboard.helpers import cleanup_mt5
-from dashboard.components import render_auto_trade_controls
 
 logger = get_logger("dashboard")
 
@@ -82,16 +81,6 @@ def _render_sidebar():
             index=0, label_visibility="collapsed", key="nav_radio"
         )
         page = selected
-
-        # Auto-trading status panel (reusable component — compact mode)
-        render_auto_trade_controls(compact=True)
-
-        # Quick actions
-        if st.button("🔄 Refresh Data", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-
-        st.checkbox("🔄 Live Refresh (10s)", value=False, key="live_refresh")
 
         # System info footer
         st.markdown(f"""
@@ -166,11 +155,4 @@ def run():
     elif page == "⚙️ Settings":
         settings_page.render()
 
-    # Non-blocking auto-refresh via st.rerun() — avoids full page reload
-    if st.session_state.get("live_refresh"):
-        if "last_rerun_time" not in st.session_state:
-            st.session_state.last_rerun_time = time.time()
-        elapsed = time.time() - st.session_state.last_rerun_time
-        if elapsed >= 10:
-            st.session_state.last_rerun_time = time.time()
-            st.rerun()
+
