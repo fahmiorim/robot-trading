@@ -168,6 +168,12 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
     """Start background thread that polls the exchange and broadcasts."""
     def _push():
         err_count = 0
+        # Wait for the WebSocket server to start running
+        for _ in range(50):
+            if ws._running:
+                break
+            time.sleep(0.1)
+
         while ws._running:
             try:
                 symbol = config.get("general", "symbol")
