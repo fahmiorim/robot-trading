@@ -31,6 +31,7 @@ from src.services.risk_service import RiskService
 from src.services.notification_service import NotificationService
 from src.services.backtest_service import BacktestService
 from src.repositories.analytics_repo import AnalyticsRepository
+from src.repositories.trade_repo import TradeRepository
 from src.services.trading.pairlist import PairlistManager
 from src.services.trading.order_manager import OrderManager
 from src.services.trading.lock_manager import LockManager
@@ -80,7 +81,12 @@ class TradingController:
         self.protection_manager = ProtectionManager()
 
         # ── Repositories ──
-        self.analytics_repo = AnalyticsRepository(db=get_db())
+        _db = get_db()
+        self.analytics_repo = AnalyticsRepository(db=_db)
+        self.trade_repo = TradeRepository(db=_db)
+
+        # Wire trade_repo into order_manager for DB persistence
+        self.order_manager.trade_repo = self.trade_repo
 
         # ── Services ──
         self.signal_service = SignalService()

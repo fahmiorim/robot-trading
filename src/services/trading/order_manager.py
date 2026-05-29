@@ -26,10 +26,12 @@ class OrderManager:
     """
 
     def __init__(self, config: ConfigManager, exchange: IExchange,
-                 trade_manager: TradeManager):
+                 trade_manager: TradeManager,
+                 trade_repo=None):
         self.config = config
         self.exchange = exchange
         self.trade_manager = trade_manager
+        self.trade_repo = trade_repo  # optional — persist to DB if provided
 
         legacy_paper = self.config.get("trading", "paper_trading")
         default_mode = "paper" if legacy_paper else "live"
@@ -129,6 +131,13 @@ class OrderManager:
         )
         self.trade_manager.add_trade(t)
 
+        # Persist to database
+        if self.trade_repo:
+            try:
+                self.trade_repo.save(t)
+            except Exception as e:
+                logger.warning(f"Failed to persist paper trade to DB: {e}")
+
         logger.info(f"📝 Paper {side} {volume} {symbol} @ {entry:.2f}")
         return {"success": True, "paper": True, "order": ticket,
                 "volume": volume, "price": entry}
@@ -146,6 +155,14 @@ class OrderManager:
                 pos["profit"] = pnl
                 self.paper_positions.remove(pos)
                 self.trade_manager.close_trade(ticket, exit_p, pnl)
+
+                # Persist exit to database
+                if self.trade_repo:
+                    try:
+                        self.trade_repo.update_exit(ticket, exit_p, pnl)
+                    except Exception as e:
+                        logger.warning(f"Failed to update trade exit in DB: {e}")
+
                 return {"success": True, "order": ticket, "profit": pnl}
         return {"success": False, "error": "Position not found"}
 
@@ -211,6 +228,20 @@ class OrderManager:
         )
         if result.get("success"):
             self._consecutive_errors = 0
+            # Persist live trade to database
+            if self.trade_repo:
+                try:
+                    ticket = result.get("order", 0)
+                    t = Trade(
+                        ticket=ticket, symbol=symbol,
+                        side=OrderSide.BUY if signal == 1 else OrderSide.SELL,
+                        volume=vol, entry_price=entry,
+                        entry_time=datetime.now(), sl=sl, tp=tp,
+                        paper_trade=False, comment="AI Robot",
+                    )
+                    self.trade_repo.save(t)
+                except Exception as e:
+                    logger.warning(f"Failed to persist live trade to DB: {e}")
         else:
             self._consecutive_errors += 1
         return result
