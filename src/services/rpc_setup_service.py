@@ -76,6 +76,7 @@ class RPCSetupService:
     def _setup_websocket(self, bot: Any) -> None:
         """Initialise WebSocket RPC backend and data pusher."""
         self.ws = WebSocketRPC()
+        self.ws.bot = bot
         start_data_pusher(self.ws, bot, self.config)
         self.ws.start()
         self.rpc.register(self.ws)

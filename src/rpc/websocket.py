@@ -138,17 +138,38 @@ class WebSocketRPC(IRPC):
     async def _handler(self, ws: WebSocketServerProtocol) -> None:
         self.clients.add(ws)
         remote = ws.remote_address
-        logger.debug(f"WS client: {remote}")
+        logger.info(f"WS client connected: {remote}")
         try:
             with self._lock:
                 if self.latest_data:
                     await ws.send(json.dumps(self.latest_data))
-            async for _ in ws:
-                pass
+            async for message in ws:
+                try:
+                    payload = json.loads(message)
+                    action = payload.get("action")
+                    if action == "close_position" and getattr(self, "bot", None):
+                        ticket = int(payload.get("ticket"))
+                        logger.info(f"WS client requested close position: ticket={ticket}")
+                        result = self.bot.close_position(ticket)
+                        if result.get("success"):
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": True,
+                                "message": f"Position #{ticket} closed successfully!"
+                            }))
+                        else:
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": False,
+                                "message": f"Failed to close position: {result.get('error', 'Unknown error')}"
+                            }))
+                except Exception as e:
+                    logger.error(f"WS message handling error: {e}")
         except websockets.exceptions.ConnectionClosed:
             pass
         finally:
             self.clients.discard(ws)
+            logger.info(f"WS client disconnected: {remote}")
 
     async def _do_broadcast(self, data: Dict[str, Any]) -> None:
         if not self.clients:

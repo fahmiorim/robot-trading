@@ -6,6 +6,7 @@ import pandas as pd
 from src.rpc.websocket import get_shared
 from dashboard.components import render_auto_trade_controls
 from dashboard.helpers import ensure_mt5
+from dashboard.styles import _PREMIUM_CSS
 
 
 def render():
@@ -36,7 +37,9 @@ def render():
 
     # ── Embedded HTML/JS for 100% Real-Time Panel ──
     realtime_panel_html = """
-    <div id="rt-dashboard-root" style="font-family: 'Outfit', sans-serif; display: flex; flex-direction: column; gap: 12px;">
+    {premium_css}
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <div id="rt-dashboard-root" style="font-family: 'Outfit', sans-serif; display: flex; flex-direction: column; gap: 12px; padding: 5px;">
         <!-- Grid 1: Bot Status & Account Info -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px;">
             <!-- Card 1: Bot Status -->
@@ -145,6 +148,11 @@ def render():
                         const d = JSON.parse(e.data);
                         console.log("WebSocket data received:", d);
                         
+                        if (d.type === "action_result") {
+                            alert(d.message);
+                            return;
+                        }
+                        
                         // Update Bot Status
                         if (d.status) {
                             if (d.price) {
@@ -250,24 +258,26 @@ def render():
             }
         }
         
-        // Parent window query parameter action trigger
+        // WebSocket action trigger for closing positions
         window.closePosition = function(ticket) {
             if (confirm("Close position #" + ticket + "?")) {
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set("close_ticket", ticket);
-                window.parent.location.href = url.toString();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({action: "close_position", ticket: ticket}));
+                } else {
+                    alert("WebSocket is not connected!");
+                }
             }
         };
         
         if(typeof WebSocket !== 'undefined') connect();
     })();
     </script>
-    """.replace("{ws_port}", str(ws_port))
+    """.replace("{ws_port}", str(ws_port)).replace("{premium_css}", _PREMIUM_CSS)
 
-    # Clean up empty lines from HTML to prevent markdown parser from splitting the HTML block
+    # Clean up empty lines from HTML
     realtime_panel_html_clean = "\n".join([line for line in realtime_panel_html.split("\n") if line.strip() != ""])
 
-    st.markdown(realtime_panel_html_clean, unsafe_allow_html=True)
+    st.components.v1.html(realtime_panel_html_clean, height=500, scrolling=False)
 
     # ── Trading & Execution Controls ──
     st.subheader("💱 Trading & Execution")
