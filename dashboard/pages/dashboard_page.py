@@ -302,12 +302,12 @@ def render():
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
-            st.markdown("### 🤖 Auto Trading Controls")
+            st.markdown("<h4 style='margin:0 0 8px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>🤖 Auto Trading Controls</h4>", unsafe_allow_html=True)
             render_auto_trade_controls()
             
     with col2:
         with st.container(border=True):
-            st.markdown("### 💱 Manual Order Execution")
+            st.markdown("<h4 style='margin:0 0 8px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>💱 Manual Order Execution</h4>", unsafe_allow_html=True)
             mc1, mc2 = st.columns(2)
             with mc1:
                 manual_symbol = st.text_input("Symbol", value=config.get("general", "symbol"), key="manual_symbol")
