@@ -27,19 +27,17 @@ def get_best_filling_mode() -> Optional[int]:
 
 
 def get_next_filling_mode(current_label: str) -> Optional[int]:
-    """Try the next filling mode when the current one fails."""
+    """Try the next filling mode when the current one fails (rotate)."""
     labels = [lbl for lbl, _ in FILLING_MODES]
     try:
         idx = labels.index(current_label)
     except ValueError:
         idx = -1
-    next_idx = idx + 1
-    if next_idx >= len(labels):
-        return None
+    
+    # Rotate to next index, or back to 0 if at the end
+    next_idx = (idx + 1) % len(labels)
+    
     next_label, next_val = FILLING_MODES[next_idx]
-    if next_label == "None (omit)":
-        next_idx += 1
-        if next_idx >= len(labels):
-            return None
-        _, next_val = FILLING_MODES[next_idx]
+    # If we rotated back to None (omit), and we just came from something else,
+    # maybe skip it or return it. Let's just return what's at the index.
     return next_val

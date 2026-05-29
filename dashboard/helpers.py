@@ -67,10 +67,35 @@ def get_available_symbols() -> List[str]:
 
 
 def refresh_robot(config: ConfigManager):
-    """Re-create the robot instance in session state."""
+    """Re-create the robot instance in session state and update global instances."""
+    import dashboard
     from src.controllers.trading_controller import TradingController
     from src.controllers.dashboard_controller import DashboardController
-    st.session_state.robot = TradingController(config=config)
+    
+    new_robot = TradingController(config=config)
+    
+    with dashboard._global_lock:
+        if dashboard._global_robot is not None:
+            try:
+                dashboard._global_robot.cleanup()
+            except Exception:
+                pass
+        dashboard._global_robot = new_robot
+        
+        if dashboard._global_worker is not None:
+            was_running = dashboard._global_worker.is_running
+            try:
+                dashboard._global_worker.stop()
+            except Exception:
+                pass
+            from src.worker import Worker
+            dashboard._global_worker = Worker(new_robot)
+            if was_running or config.get("general", "auto_trade"):
+                dashboard._global_worker.start()
+                
+    st.session_state.robot = dashboard._global_robot
+    if dashboard._global_worker is not None:
+        st.session_state.worker = dashboard._global_worker
     st.session_state.dashboard_ctrl = DashboardController(config=config)
     st.session_state.last_refresh = time.time()
 

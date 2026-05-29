@@ -18,7 +18,7 @@ class RiskManager:
 
     def __init__(self, config):
         self.config = config
-        self.protection_mgr = ProtectionManager()
+        self.protection_mgr = ProtectionManager(config)
         self.protection_ctx = ProtectionContext()
 
         # Risk state
@@ -30,17 +30,62 @@ class RiskManager:
         self.consecutive_errors: int = 0
         self._max_drawdown_pct_ever: float = 0.0
         self._last_trade_time: float = 0
+        self._last_date = date.today()
+
+        # Load state from DB if available
+        self._load_state()
+
+    def _load_state(self):
+        """Load persistent risk state from database."""
+        try:
+            from src.persistence.database import get_db
+            db = get_db()
+            state = db.load_risk_state()
+            if state:
+                if state.get("initial_balance"):
+                    self.initial_balance = state["initial_balance"]
+                if state.get("peak_balance"):
+                    self.peak_balance = state["peak_balance"]
+                if state.get("daily_start_balance"):
+                    self.daily_start_balance = state["daily_start_balance"]
+
+                # Check when the state was last updated to ensure correct day comparison
+                last_updated = state.get("last_updated")
+                if isinstance(last_updated, datetime):
+                    self._last_date = last_updated.date()
+
+                logger.info(f"Persistent risk state loaded: peak={self.peak_balance:.2f}")
+        except Exception as e:
+            logger.warning(f"Failed to load persistent risk state: {e}")
+
+    def _save_state(self):
+        """Save persistent risk state to database."""
+        try:
+            from src.persistence.database import get_db
+            db = get_db()
+            db.save_risk_state(
+                symbol=self.config.get("general", "symbol"),
+                initial_balance=self.initial_balance,
+                peak_balance=self.peak_balance,
+                daily_start_balance=self.daily_start_balance
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save persistent risk state: {e}")
 
     def update_balance(self, balance: float) -> None:
         """Update balance tracking and recalculate risk metrics."""
         self.current_balance = balance
+        changed = False
+
         if balance > self.peak_balance:
             self.peak_balance = balance
+            changed = True
 
         # Daily start balance reset at midnight
         if self._is_new_day():
             self.daily_start_balance = balance
             self.daily_loss_pct = 0.0
+            changed = True
 
         # Daily loss % since start of day
         if self.daily_start_balance > 0:
@@ -54,6 +99,9 @@ class RiskManager:
         self.protection_ctx.max_drawdown_pct = max(
             self.protection_ctx.max_drawdown_pct, drawdown
         )
+
+        if changed:
+            self._save_state()
 
     def get_drawdown_pct(self) -> float:
         """Return current drawdown as percentage from peak."""
@@ -100,6 +148,8 @@ class RiskManager:
         if profit < 0:
             self.protection_ctx.consecutive_losses += 1
             self.protection_ctx.stoploss_hits += 1
+            if self.protection_ctx.stoploss_window_start == 0:
+                self.protection_ctx.stoploss_window_start = self._last_trade_time
         else:
             self.protection_ctx.consecutive_losses = 0
 
@@ -167,4 +217,11 @@ class RiskManager:
 
     def _is_new_day(self) -> bool:
         """Check if a new calendar day has started."""
-        return date.today() != getattr(self, "_last_date", date.today())
+        today = date.today()
+        if not hasattr(self, "_last_date"):
+            self._last_date = today
+            return False
+        if today != self._last_date:
+            self._last_date = today
+            return True
+        return False

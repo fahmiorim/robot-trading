@@ -202,7 +202,6 @@ def main():
             cursor.execute("DELETE FROM settings")
             conn.commit()
             cursor.close()
-            db._settings_seeded = False
             print("  🧹 Cleared existing settings")
         _seed_settings(db)
     except Exception as e:

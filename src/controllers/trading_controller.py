@@ -12,7 +12,7 @@ Usage:
 
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 
@@ -28,6 +28,7 @@ from src.services.strategy_service import StrategyService
 from src.services.trade_execution_service import TradeExecutionService
 from src.services.ml_service import MLService
 from src.services.risk_service import RiskService
+from src.services.system_service import SystemService
 from src.services.notification_service import NotificationService
 from src.services.backtest_service import BacktestService
 from src.repositories.analytics_repo import AnalyticsRepository
@@ -52,7 +53,7 @@ class TradingController:
         self.config = config or ConfigManager()
 
         # ── PID Lock ──
-        self.lock_manager = LockManager()
+        self.lock_manager = LockManager(lock_file="bot.lock")
         self.lock_manager.acquire(bypass=bypass_lock)
 
         self.symbol = self.config.get("general", "symbol")
@@ -65,7 +66,7 @@ class TradingController:
             self.paper_trading = self.trading_mode in ("paper", "dry-run")
         else:
             # Fallback: support paper_trading boolean from config
-            self.paper_trading = self.config.get("trading", "paper_trading", default=False)
+            self.paper_trading = self.config.get("trading", "paper_trading")
             self.trading_mode = "paper" if self.paper_trading else "live"
 
         # ── Exchange (via factory) ──
@@ -73,12 +74,15 @@ class TradingController:
 
         # ── Core subsystems ──
         self.pairlist = PairlistManager(self.config, self.exchange)
-        self.data_provider = DataProvider(self.exchange, self.symbol, self.timeframe)
+        self.data_provider = DataProvider(
+            self.exchange, self.symbol, self.timeframe,
+            default_count=self.config.get("general", "data_count"),
+        )
         self.trade_manager = TradeManager()
         self.order_manager = OrderManager(self.config, self.exchange, self.trade_manager)
 
         self.risk_manager = RiskManager(self.config)
-        self.protection_manager = ProtectionManager()
+        self.protection_manager = ProtectionManager(self.config)
 
         # ── Repositories ──
         _db = get_db()
@@ -102,8 +106,11 @@ class TradingController:
         self.ml_service = MLService(
             model_type=self.config.get("ml", "model_type"),
             retrain_interval_hours=self.config.get("ml", "retrain_interval_hours"),
+            model_path=self.config.get("ml", "model_path"),
+            config=self.config,
         )
-        self.risk_service = RiskService(self.risk_manager, self.protection_manager, self.analytics_repo)
+        self.risk_service = RiskService(self.config, self.risk_manager, self.protection_manager, self.analytics_repo)
+        self.system_service = SystemService()
 
         # ── RPC / Notifications (via RPCSetupService) ──
         self.rpc = RPCManager()
@@ -112,18 +119,30 @@ class TradingController:
         self._rpc_setup.setup_all(self)
         self.trade_execution_service.rpc = self.rpc
 
-        # ── Auto-trading state ──
-        self.auto_trading: bool = False
-        self._stop_buy: bool = False
-
         # ── Cycle tracking ──
-        self._cycle_count: int = 0
-        self._last_cycle_time: float = time.time()
-        self._consecutive_errors: int = 0
+        # (State now managed by system_service)
 
         logger.info(f"Controller ready: {self.symbol}/{self.timeframe}, "
                     f"paper={self.paper_trading}, "
                     f"strategies={list(self.strategies.keys())}")
+
+    # ── State Accessors ──────────────────────────────────────
+
+    @property
+    def auto_trading(self) -> bool:
+        return self.system_service.auto_trading
+
+    @auto_trading.setter
+    def auto_trading(self, value: bool):
+        self.system_service.auto_trading = value
+
+    @property
+    def stop_buy(self) -> bool:
+        return self.system_service.stop_buy
+
+    @stop_buy.setter
+    def stop_buy(self, value: bool):
+        self.system_service.stop_buy = value
 
     # ── Data ──
 
@@ -132,12 +151,13 @@ class TradingController:
         return self.data_provider.fetch(count=count, force_refresh=force_refresh)
 
     def get_current_price(self) -> Dict[str, float]:
-        return self.exchange.fetch_ticker(self.symbol)
+        return self.exchange.fetch_ticker(self.symbol)        # ── Register drift alert hook ──
+        self.ml_service.trainer.on("drift", self._on_concept_drift)
 
-    # ── Backtest & Strategy ──
+        # ── Backtest & Strategy ──
 
-    def run_backtest_all(self, data: pd.DataFrame) -> Dict[str, Any]:
-        results = self.strategy_service.run_backtest_all(data)
+    def run_backtest_all(self, data: pd.DataFrame, callback: Optional[Callable] = None) -> Dict[str, Any]:
+        results = self.strategy_service.run_backtest_all(data, callback=callback)
         # Update controller state from strategy service
         self.strategies = self.strategy_service.strategies
         self.best_strategy_name = self.strategy_service.best_strategy_name
@@ -166,6 +186,7 @@ class TradingController:
             use_ml=use_ml,
             use_agent=use_agent,
             use_swarm=use_swarm,
+            config=self.config,
         )
         return sig
 
@@ -197,7 +218,7 @@ class TradingController:
 
     def update_paper_positions(self):
         """Public method: refresh paper positions from simulated exchange."""
-        self.order_manager.update_paper_positions(self.get_current_price)
+        self.order_manager.update_paper_positions()
 
     # Keep backward-compat alias
     _update_paper_positions = update_paper_positions
@@ -208,10 +229,9 @@ class TradingController:
         self.trade_execution_service.check_roi_take_profit(self.paper_trading)
 
     def _check_dca_opportunity(self) -> Optional[Dict]:
-        default = self.config.get("trading", "paper_initial_balance", default=10000.0)
         balance = (self.order_manager.paper_balance
                    if hasattr(self.order_manager, 'paper_balance')
-                   else default)
+                   else self.config.get("trading", "paper_initial_balance"))
         return self.trade_execution_service.check_dca_opportunity(
             paper_trading=self.paper_trading,
             paper_positions=self.order_manager.paper_positions,
@@ -226,17 +246,28 @@ class TradingController:
     # ── Trading Cycle ──
 
     def run_cycle(self, force_refresh: bool = False) -> Dict:
-        self._cycle_count += 1
-        self._last_cycle_time = time.time()
-        logger.info(f"{'='*40}\nCycle #{self._cycle_count}")
+        self.system_service.mark_cycle_start()
+        logger.info(f"{'='*40}\nCycle #{self.system_service.cycle_count}")
+
+        # Update Risk Balance before cycle starts
+        try:
+            if self.paper_trading:
+                self.risk_manager.update_balance(self.order_manager.paper_balance)
+            else:
+                acc = self.exchange.get_balance()
+                if acc.get("balance"):
+                    self.risk_manager.update_balance(acc["balance"])
+        except Exception as e:
+            logger.error(f"Risk balance update failed: {e}")
+
         try:
             data = self.fetch_data(force_refresh=force_refresh)
         except Exception as e:
-            self._consecutive_errors += 1
+            self.system_service.mark_error()
             return {"success": False, "step": "fetch", "error": str(e)}
         try:
             self.run_backtest_all(data)
-            if self._cycle_count == 1:
+            if self.system_service.cycle_count == 1:
                 self.validate_strategies(data)
         except Exception as e:
             return {"success": False, "step": "backtest", "error": str(e)}
@@ -260,8 +291,20 @@ class TradingController:
         if use_ml:
             try:
                 self.ml_service.ensure_trained(data)
+                self.ml_service.retrain_if_needed(data)
+
+                # ── Concept drift auto-retrain ────────────────
+                # If latest accuracy dropped >5% vs previous runs,
+                # force an immediate retrain with fresh data.
+                # Guard: only retrain once per session to prevent
+                # infinite loops if the market has permanently shifted.
+                if self.ml_service.trainer.concept_drifted and not getattr(self, '_drift_retrained', False):
+                    logger.warning("Concept drift detected — forcing immediate retrain...")
+                    self._drift_retrained = True
+                    fresh_data = self.fetch_data(force_refresh=True)
+                    self.ml_service.train(fresh_data, save=True)
             except Exception as e:
-                logger.warning(f"ML train failed: {e}")
+                logger.warning(f"ML process failed: {e}")
         use_agent = self.config.get("signals", "use_agent")
         use_swarm = self.config.get("signals", "use_swarm")
         signal = self.get_signal(data, use_ml=use_ml,
@@ -274,16 +317,46 @@ class TradingController:
                 self.risk_service.update_trailing_stops(self.exchange, self.symbol)
             except Exception:
                 pass
-        if getattr(self, '_stop_buy', False) and signal == 1:
+        if self.system_service.stop_buy and signal == 1:
             logger.info("Stop-buy active — skipping BUY signal")
             signal = 0
+            
         if signal == 0:
-            self._consecutive_errors = 0
+            self.system_service.mark_success()
             return {"success": True, "signal": 0, "action": "HOLD",
-                    "cycle": self._cycle_count}
+                    "cycle": self.system_service.cycle_count}
+
+        # --- Risk Check ---
+        if not self.risk_service.can_trade():
+            reason = self.risk_service.get_daily_stats().get("reason", "Risk limit reached")
+            logger.warning(f"Trade blocked by risk service: {reason}")
+            return {"success": False, "error": "risk_blocked", "reason": reason}
+
         result = self.execute_trade(signal)
+        if result.get("success"):
+            self.system_service.mark_success()
+        else:
+            self.system_service.mark_error()
+            
         logger.info(f"Trade result: {result}")
         return result
+
+    # ── Concept Drift Alert ──
+
+    def _on_concept_drift(self, drift_info: dict) -> None:
+        """Called when concept drift is detected after training.
+        Broadcasts an alert to all notification backends (Telegram, WebSocket, etc.)."""
+        try:
+            msg = (
+                f"🚨 <b>Concept Drift Detected</b>\n"
+                f"Latest accuracy: <b>{drift_info.get('latest_acc', 0):.2%}</b>\n"
+                f"Previous avg: <b>{drift_info.get('avg_prev_3', 0):.2%}</b>\n"
+                f"Drop: <b style='color:#ef4444;'>{drift_info.get('drop_pct', 0):.1f}%</b>\n"
+                f"Auto-retrain akan dijalankan pada siklus berikutnya."
+            )
+            self.notification_service.broadcast(msg)
+        except Exception as e:
+            logger.warning(f"Failed to send drift alert: {e}")
 
     # ── Backward-compat properties ──
 
@@ -295,18 +368,17 @@ class TradingController:
     @property
     def paper_balance(self):
         """Backward-compat: dashboard accesses robot.paper_balance."""
-        default = self.config.get("trading", "paper_initial_balance", default=10000.0)
-        return getattr(self.order_manager, 'paper_balance', default)
+        return getattr(self.order_manager, 'paper_balance', self.config.get("trading", "paper_initial_balance"))
 
     @property
     def cycle_count(self) -> int:
-        """Public accessor for dashboard (was _cycle_count)."""
-        return self._cycle_count
+        """Public accessor for dashboard."""
+        return self.system_service.cycle_count
 
     @property
     def consecutive_errors(self) -> int:
-        """Public accessor for dashboard (was _consecutive_errors)."""
-        return self._consecutive_errors
+        """Public accessor for dashboard."""
+        return self.system_service.consecutive_errors
 
     @property
     def risk(self):
@@ -329,6 +401,7 @@ class TradingController:
 
     def status(self) -> Dict:
         """Get full status dict for dashboard and CLI."""
+        health = self.system_service.get_health_status()
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,
@@ -343,11 +416,12 @@ class TradingController:
             "paper_positions": len(self.order_manager.paper_positions),
             "has_data": self.data_provider.last_data is not None,
             "connection": self.exchange.is_connected(),
-            "cycle_count": self._cycle_count,
-            "consecutive_errors": self._consecutive_errors,
-            "last_cycle_time": self._last_cycle_time,
+            "cycle_count": health["cycle_count"],
+            "consecutive_errors": health["consecutive_errors"],
+            "last_cycle_time": health["last_cycle_time"],
             "ml_trained": self.ml_service.is_trained,
             "ml_accuracy": self.ml_service.last_accuracy,
+            "ml_concept_drifted": self.ml_service.trainer.concept_drifted,
             "pairlist_pairs": self.pairlist.get_pairs(),
             "pairlist_count": len(self.pairlist.get_pairs()),
         }

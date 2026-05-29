@@ -33,10 +33,7 @@ class OrderManager:
         self.trade_manager = trade_manager
         self.trade_repo = trade_repo  # optional — persist to DB if provided
 
-        legacy_paper = self.config.get("trading", "paper_trading")
-        default_mode = "paper" if legacy_paper else "live"
-        raw_mode = self.config.get("trading", "mode")
-        self.trading_mode = raw_mode.lower() if raw_mode else default_mode
+        self.trading_mode = self.config.get("trading", "mode")
         self.paper_trading = self.trading_mode in ("paper", "dry-run")
         self.paper_initial_balance = self.config.get("trading", "paper_initial_balance")
 
@@ -44,6 +41,30 @@ class OrderManager:
         self.paper_positions: List[Dict] = []
         self._last_paper_trade_time: float = 0
         self._consecutive_errors: int = 0
+
+        # Load open positions from DB for paper trading (Persistence fix)
+        if self.paper_trading and self.trade_repo:
+            self._load_open_positions_from_db()
+
+    def _load_open_positions_from_db(self):
+        """Sync memory with database for paper positions on startup."""
+        try:
+            open_trades = self.trade_repo.find_open()
+            for t in open_trades:
+                if t.paper_trade:
+                    # Convert model back to dict format for order_manager
+                    pos_dict = t.to_dict()
+                    # Mapping model keys to dict keys used in order_manager
+                    pos_dict["action"] = t.side.value
+                    pos_dict["price"] = t.entry_price
+                    self.paper_positions.append(pos_dict)
+                    # Also register in trade_manager memory
+                    self.trade_manager.add_trade(t)
+            
+            if self.paper_positions:
+                logger.info(f"Synced {len(self.paper_positions)} open paper positions from database")
+        except Exception as e:
+            logger.error(f"Failed to sync paper positions from DB: {e}")
 
     def execute_trade(self, signal: int, symbol: str,
                       volume: Optional[float] = None,
@@ -62,11 +83,11 @@ class OrderManager:
 
         # Live mode with optional custom order types
         order_cfg = self.config.get("order_types")
-        use_custom = isinstance(order_cfg, dict) and order_cfg.get("custom", False)
+        use_custom = isinstance(order_cfg, dict) and order_cfg["custom"]
 
         if use_custom:
-            use_oco = order_cfg.get("use_oco", False)
-            use_sll = order_cfg.get("use_stop_loss_limit", False)
+            use_oco = order_cfg["use_oco"]
+            use_sll = order_cfg["use_stop_loss_limit"]
 
             if use_oco and sl is not None and tp is not None:
                 return self._execute_oco_trade(signal, symbol, volume, sl, tp)
@@ -103,10 +124,12 @@ class OrderManager:
         if entry <= 0:
             return {"success": False, "error": "Invalid price"}
 
+        sl_pct = self.config.get("risk_management", "stop_loss_pct") / 100
+        tp_pct = self.config.get("risk_management", "take_profit_pct") / 100
         if sl is None:
-            sl = default_sl(entry, "BUY" if signal == 1 else "SELL")
+            sl = default_sl(entry, "BUY" if signal == 1 else "SELL", sl_pct)
         if tp is None:
-            tp = default_tp(entry, "BUY" if signal == 1 else "SELL")
+            tp = default_tp(entry, "BUY" if signal == 1 else "SELL", tp_pct)
 
         ticket = random.randint(100000, 999999)
         side = "BUY" if signal == 1 else "SELL"
@@ -153,6 +176,7 @@ class OrderManager:
                 exit_p = price["bid"] if pos["action"] == "BUY" else price["ask"]
                 pnl = self._calc_paper_pnl(pos, exit_p)
                 pos["profit"] = pnl
+                self.paper_balance += pnl
                 self.paper_positions.remove(pos)
                 self.trade_manager.close_trade(ticket, exit_p, pnl)
 
@@ -166,25 +190,39 @@ class OrderManager:
                 return {"success": True, "order": ticket, "profit": pnl}
         return {"success": False, "error": "Position not found"}
 
-    def update_paper_positions(self, get_current_price_func) -> None:
+    def update_paper_positions(self) -> None:
         if not self.paper_positions:
             return
-        price = get_current_price_func()
+        
+        # Group positions by symbol to minimize price fetch calls
+        symbols = set(pos["symbol"] for pos in self.paper_positions)
+        prices = {}
+        for sym in symbols:
+            try:
+                prices[sym] = self.exchange.fetch_ticker(sym)
+            except Exception as e:
+                logger.error(f"Failed to fetch price for {sym}: {e}")
+
         for pos in list(self.paper_positions):
+            sym = pos["symbol"]
+            price = prices.get(sym)
+            if not price:
+                continue
+
             is_buy = pos["action"] == "BUY"
             current = price["bid"] if is_buy else price["ask"]
             if is_buy:
-                if current <= pos.get("sl", 0):
+                if current <= pos.get("sl", 0) and pos.get("sl", 0) > 0:
                     self.close_paper_position(pos["ticket"])
                     continue
-                if current >= pos.get("tp", float("inf")):
+                if current >= pos.get("tp", float("inf")) and pos.get("tp", 0) > 0:
                     self.close_paper_position(pos["ticket"])
                     continue
             else:
-                if current >= pos.get("sl", float("inf")):
+                if current >= pos.get("sl", float("inf")) and pos.get("sl", 0) > 0:
                     self.close_paper_position(pos["ticket"])
                     continue
-                if current <= pos.get("tp", 0):
+                if current <= pos.get("tp", 0) and pos.get("tp", 0) > 0:
                     self.close_paper_position(pos["ticket"])
                     continue
             pos["current_price"] = current
@@ -192,14 +230,25 @@ class OrderManager:
 
     def _calc_paper_pnl(self, pos: Dict, exit_price: float) -> float:
         is_buy = pos["action"] == "BUY"
-        contract_size = 100.0
+        symbol = pos.get("symbol")
+        if not symbol:
+             # Fallback to current bot symbol if missing in position dict
+             symbol = self.config.get("general", "symbol")
+        
+        # Try to get contract size from exchange, fallback to config
+        try:
+            info = self.exchange.get_symbol_info(symbol)
+            contract_size = info.get("contract_size", 100.0)
+        except Exception:
+            contract_size = float(self.config.get("order", "contract_size"))
+
         commission_pct = self.config.get("backtest", "commission_pct")
         if is_buy:
             pnl = (exit_price - pos["price"]) * pos["volume"] * contract_size
         else:
             pnl = (pos["price"] - exit_price) * pos["volume"] * contract_size
-        entry_comm = pos["price"] * pos["volume"] * (commission_pct / 100.0)
-        exit_comm = exit_price * pos["volume"] * (commission_pct / 100.0)
+        entry_comm = pos["price"] * pos["volume"] * contract_size * (commission_pct / 100.0)
+        exit_comm = exit_price * pos["volume"] * contract_size * (commission_pct / 100.0)
         return pnl - entry_comm - exit_comm
 
     # ── Live Orders ──────────────────────────────────────────
@@ -269,11 +318,13 @@ class OrderManager:
 
         try:
             side = "BUY" if signal == 1 else "SELL"
+            sl_pct = self.config.get("risk_management", "stop_loss_pct") / 100
+            tp_pct = self.config.get("risk_management", "take_profit_pct") / 100
             oco_result = self.exchange.create_oco_order(
                 symbol=symbol, side=side, volume=vol,
                 price=entry,
-                stop_loss_price=sl or default_sl(entry, side),
-                take_profit_price=tp or default_tp(entry, side),
+                stop_loss_price=sl or default_sl(entry, side, sl_pct),
+                take_profit_price=tp or default_tp(entry, side, tp_pct),
             )
             if oco_result.get("success"):
                 self._consecutive_errors = 0
@@ -308,8 +359,10 @@ class OrderManager:
             vol = self.config.get("trading", "paper_lot_size")
         else:
             vol = volume
-        stop_loss = sl or default_sl(entry, entry_side)
-        limit_price = stop_loss * 0.999 if exit_side == "SELL" else stop_loss * 1.001
+        sl_pct = self.config.get("risk_management", "stop_loss_pct") / 100
+        stop_loss = sl or default_sl(entry, entry_side, sl_pct)
+        slip = float(self.config.get("order", "stoploss_limit_slip"))
+        limit_price = stop_loss * (1 - slip) if exit_side == "SELL" else stop_loss * (1 + slip)
 
         try:
             protect_result = self.exchange.create_stop_loss_limit_order(

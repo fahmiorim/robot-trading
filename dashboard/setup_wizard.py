@@ -1,4 +1,4 @@
-﻿"""Database setup wizard — shown on first run when DB is not available.
+"""Database setup wizard — shown on first run when DB is not available.
 
 Flow:
   1. User enters DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
@@ -20,7 +20,7 @@ SCHEMA_STATEMENTS = [
     # risk_state
     """CREATE TABLE IF NOT EXISTS risk_state (
         id          INT PRIMARY KEY DEFAULT 1,
-        symbol      VARCHAR(20) NOT NULL DEFAULT 'XAUUSD',
+        symbol      VARCHAR(20) NOT NULL,
         initial_balance     DECIMAL(15,2),
         peak_balance        DECIMAL(15,2),
         daily_start_balance DECIMAL(15,2),

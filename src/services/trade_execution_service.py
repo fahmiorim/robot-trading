@@ -41,41 +41,53 @@ class TradeExecutionService:
                       sl: Optional[float] = None,
                       tp: Optional[float] = None) -> Dict:
         """Execute a trade via the order manager."""
-        sym = symbol or getattr(self.exchange, 'symbol', 'XAUUSD')
+        sym = symbol or self.exchange.symbol
         return self.order_manager.execute_trade(signal, sym, volume, sl, tp)
 
     def close_position(self, ticket: int) -> Dict:
         """Close a position by ticket number."""
         return self.order_manager.close_position(ticket)
 
-    def get_current_price(self) -> Dict[str, float]:
-        """Get current price for the active symbol."""
-        symbol = getattr(self.exchange, 'symbol', 'XAUUSD')
-        return self.exchange.fetch_ticker(symbol)
+    def get_current_price(self, symbol: str = None) -> Dict[str, float]:
+        """Get current price for the active or specified symbol."""
+        sym = symbol or self.exchange.symbol
+        return self.exchange.fetch_ticker(sym)
 
     # ── ROI Take-Profit ──
 
     def check_roi_take_profit(self, paper_trading: bool) -> None:
         """Check and close positions that have reached ROI take-profit."""
-        symbol = getattr(self.exchange, 'symbol', 'XAUUSD')
+        symbol = self.exchange.symbol
+        positions = (self.order_manager.paper_positions 
+                     if paper_trading 
+                     else self.exchange.get_open_positions(symbol))
+        
         self.roi_manager.check_take_profit(
             exchange=self.exchange,
             symbol=symbol,
             paper_trading=paper_trading,
             close_position_fn=self.close_position,
+            positions_override=positions,
         )
 
     # ── DCA (Dollar Cost Averaging) ──
 
     def check_dca_opportunity(self, paper_trading: bool,
-                              paper_positions: list = None,
-                              paper_balance: float = 10000.0) -> Optional[Dict]:
+                              paper_positions: list,
+                              paper_balance: float) -> Optional[Dict]:
         """Check if there's a DCA opportunity."""
+        if paper_trading:
+            positions = paper_positions or []
+            balance = paper_balance
+        else:
+            positions = self.exchange.get_open_positions(self.exchange.symbol)
+            balance = self.exchange.get_balance().get("balance", 0)
+
         return self.dca_manager.check_opportunity(
-            paper_positions=paper_positions or [],
+            paper_positions=positions,
             get_current_price_fn=self.get_current_price,
             paper_trading=paper_trading,
-            paper_balance=paper_balance,
+            paper_balance=balance,
         )
 
     def execute_dca(self, dca_info: Dict, current_regime: str) -> Dict:

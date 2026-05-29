@@ -6,12 +6,17 @@ Source of truth for all indicator calculations to avoid DRY violations.
 import pandas as pd
 
 
-def calculate_rsi(prices: pd.Series, period: int = 14) -> pd.Series:
-    """Relative Strength Index (0-100)."""
+def calculate_rsi(prices: pd.Series, period: int) -> pd.Series:
+    """Relative Strength Index (Wilder's - 0-100)."""
     delta = prices.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
-    rs = gain / (loss + 1e-10)
+    gain = (delta.where(delta > 0, 0))
+    loss = (-delta.where(delta < 0, 0))
+    
+    # Use exponential moving average (Wilder's method)
+    avg_gain = gain.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+    
+    rs = avg_gain / (avg_loss + 1e-10)
     return 100 - (100 / (1 + rs))
 
 
@@ -26,7 +31,7 @@ def calculate_ema(prices: pd.Series, period: int) -> pd.Series:
 
 
 def calculate_bollinger_bands(
-    prices: pd.Series, period: int = 20, std_dev: float = 2.0
+    prices: pd.Series, period: int, std_dev: float
 ) -> tuple:
     """Return (middle, upper, lower) Bollinger Bands."""
     ma = prices.rolling(period).mean()
@@ -37,7 +42,7 @@ def calculate_bollinger_bands(
 
 
 def calculate_adx(high: pd.Series, low: pd.Series, close: pd.Series,
-                  period: int = 14) -> pd.Series:
+                  period: int) -> pd.Series:
     """Average Directional Index."""
     plus_dm = (high - high.shift(1)).clip(lower=0)
     minus_dm = (low.shift(1) - low).clip(lower=0)
@@ -51,8 +56,8 @@ def calculate_adx(high: pd.Series, low: pd.Series, close: pd.Series,
     return dx.ewm(span=period).mean()
 
 
-def calculate_macd(prices: pd.Series, fast: int = 12, slow: int = 26,
-                   signal: int = 9) -> tuple:
+def calculate_macd(prices: pd.Series, fast: int, slow: int,
+                   signal: int) -> tuple:
     """Return (MACD line, signal line, histogram)."""
     ema_fast = prices.ewm(span=fast, adjust=False).mean()
     ema_slow = prices.ewm(span=slow, adjust=False).mean()
@@ -63,7 +68,7 @@ def calculate_macd(prices: pd.Series, fast: int = 12, slow: int = 26,
 
 
 def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series,
-                  period: int = 14) -> pd.Series:
+                  period: int) -> pd.Series:
     """Average True Range."""
     tr1 = high - low
     tr2 = abs(high - close.shift(1))

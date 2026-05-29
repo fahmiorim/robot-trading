@@ -3,7 +3,7 @@
 Extracted from TradingController._init_exchange() to keep controllers thin.
 
 Usage:
-    exchange = ExchangeFactory.from_config(config, symbol="XAUUSD")
+    exchange = ExchangeFactory.from_config(config)
 """
 
 from typing import Optional
@@ -37,21 +37,25 @@ class ExchangeFactory:
         Returns:
             Configured exchange instance.
         """
-        exchange_type = (config.get("exchange", "type") or "mt5").lower()
+        exchange_type = config.get("exchange", "type").lower()
         sym = symbol or config.get("general", "symbol")
         magic = config.get("general", "magic_number")
+        sl_pct = config.get("exchange", "default_sl_pct")
+        tp_pct = config.get("exchange", "default_tp_pct")
 
         if exchange_type == "bybit":
-            return ExchangeFactory._create_bybit(config, sym, magic)
+            return ExchangeFactory._create_bybit(config, sym, magic, sl_pct, tp_pct)
         elif exchange_type == "ccxt":
-            return ExchangeFactory._create_ccxt(config, sym, magic)
+            return ExchangeFactory._create_ccxt(config, sym, magic, sl_pct, tp_pct)
         else:
-            return MT5Exchange(symbol=sym, magic_number=magic)
+            return MT5Exchange(symbol=sym, magic_number=magic,
+                               default_sl_pct=sl_pct, default_tp_pct=tp_pct)
 
     # ── Private constructors ──────────────────────────────────
 
     @staticmethod
-    def _create_bybit(config: ConfigManager, symbol: str, magic: int) -> BybitExchange:
+    def _create_bybit(config: ConfigManager, symbol: str, magic: int,
+                      sl_pct: float, tp_pct: float) -> BybitExchange:
         bybit_cfg = config.get("exchange", "bybit")
         return BybitExchange(
             symbol=symbol,
@@ -73,10 +77,13 @@ class ExchangeFactory:
             ),
             options=config.get("exchange", "options"),
             magic_number=magic,
+            default_sl_pct=sl_pct,
+            default_tp_pct=tp_pct,
         )
 
     @staticmethod
-    def _create_ccxt(config: ConfigManager, symbol: str, magic: int) -> CCXTExchange:
+    def _create_ccxt(config: ConfigManager, symbol: str, magic: int,
+                     sl_pct: float, tp_pct: float) -> CCXTExchange:
         return CCXTExchange(
             exchange_name=config.get("exchange", "name"),
             symbol=symbol,
@@ -86,4 +93,6 @@ class ExchangeFactory:
             sandbox=config.get("exchange", "sandbox"),
             options=config.get("exchange", "options"),
             magic_number=magic,
+            default_sl_pct=sl_pct,
+            default_tp_pct=tp_pct,
         )

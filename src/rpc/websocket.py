@@ -43,7 +43,7 @@ class WebSocketRPC(IRPC):
     Runs in a background daemon thread alongside the main bot.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8765):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
         self.clients: Set[WebSocketServerProtocol] = set()
@@ -241,7 +241,7 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                 # Fetch candles to compute signals
                 candles = None
                 try:
-                    candles = bot.fetch_data(data_count=100)
+                    candles = bot.fetch_data(count=100)
                 except Exception:
                     pass
 
@@ -279,6 +279,16 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                         "profit": p.get("profit", 0)
                     })
 
+                # ── Real-time ML training event (push from set_shared, clear after read) ──
+                ml_event = get_shared("ml_training_event", None)
+                ml_training_data = None
+                if ml_event is not None:
+                    # Only include if less than 3s old (prevent stale events)
+                    if time.time() - ml_event.get("timestamp", 0) < 3:
+                        ml_training_data = ml_event
+                    # Clear shared state so it's only sent once
+                    set_shared("ml_training_event", None)
+
                 data = {
                     "type": "market_data",
                     "timestamp": time.time(),
@@ -314,7 +324,8 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                         "agent": sig_agent,
                         "swarm": sig_swarm
                     },
-                    "risk": risk_summary
+                    "risk": risk_summary,
+                    "ml_training": ml_training_data,
                 }
                 ws.broadcast(data)
                 err_count = 0
@@ -322,8 +333,16 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                 err_count += 1
                 logger.error(f"WS pusher error: {e}")
                 if err_count > 10:
-                    time.sleep(10)
-            time.sleep(1.5)
+                    # Poll ws._running while sleeping to stop promptly on shutdown
+                    for _ in range(10):
+                        if not ws._running:
+                            return
+                        time.sleep(1)
+            # Poll ws._running to stop promptly on shutdown
+            for _ in range(3):
+                if not ws._running:
+                    return
+                time.sleep(0.5)
 
     t = threading.Thread(target=_push, daemon=True, name="ws-pusher")
     t.start()

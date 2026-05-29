@@ -35,7 +35,7 @@ class PairlistManager:
             self._refresh()
         return self._cache
 
-    def get_pair_metrics(self, count: int = 200) -> pd.DataFrame:
+    def get_pair_metrics(self, count: int) -> pd.DataFrame:
         rows = []
         for pair in self.get_pairs():
             try:
@@ -58,9 +58,9 @@ class PairlistManager:
         try:
             symbols = self.exchange.get_symbols()
             cfg = self.config.get("pairlist")
-            base_symbols = cfg.get("symbols", ["XAUUSD"]) if isinstance(cfg, dict) else ["XAUUSD"]
-            blacklist = cfg.get("blacklist", []) if isinstance(cfg, dict) else []
-            max_pairs = cfg.get("max_pairs", 10) if isinstance(cfg, dict) else 10
+            base_symbols = cfg["symbols"] if isinstance(cfg, dict) else [self.config.get("general", "symbol")]
+            blacklist = cfg["blacklist"] if isinstance(cfg, dict) else []
+            max_pairs = cfg["max_pairs"] if isinstance(cfg, dict) else 10
             filters_cfg = self.config.get("pairlist_filters")
 
             filtered = [
@@ -72,8 +72,8 @@ class PairlistManager:
             filt_desc = []
 
             # Volume filter
-            if isinstance(filters_cfg, dict) and filters_cfg.get("volume_enabled", False):
-                vol_min = float(filters_cfg.get("volume_min_avg", 10000.0))
+            if isinstance(filters_cfg, dict) and filters_cfg["volume_enabled"]:
+                vol_min = float(filters_cfg["volume_min_avg"])
                 before = len(filtered)
                 vol_filtered = []
                 for s in filtered:
@@ -89,7 +89,7 @@ class PairlistManager:
                 if removed > 0:
                     filt_desc.append(f"volume({removed} removed)")
 
-                if filters_cfg.get("volume_sort", True):
+                if filters_cfg["volume_sort"]:
                     vol_map = {}
                     for s in filtered:
                         try:
@@ -100,9 +100,9 @@ class PairlistManager:
                     filtered.sort(key=lambda s: vol_map.get(s, 0), reverse=True)
 
             # Price filter
-            if isinstance(filters_cfg, dict) and filters_cfg.get("price_enabled", False):
-                p_min = float(filters_cfg.get("price_min", 0.001))
-                p_max = float(filters_cfg.get("price_max", 100000.0))
+            if isinstance(filters_cfg, dict) and filters_cfg["price_enabled"]:
+                p_min = float(filters_cfg["price_min"])
+                p_max = float(filters_cfg["price_max"])
                 before = len(filtered)
                 price_filtered = []
                 for s in filtered:
@@ -119,8 +119,8 @@ class PairlistManager:
                     filt_desc.append(f"price({removed} removed)")
 
             # Spread filter
-            if isinstance(filters_cfg, dict) and filters_cfg.get("spread_enabled", False):
-                max_spread_pct = float(filters_cfg.get("spread_max_pct", 0.5))
+            if isinstance(filters_cfg, dict) and filters_cfg["spread_enabled"]:
+                max_spread_pct = float(filters_cfg["spread_max_pct"])
                 before = len(filtered)
                 spread_filtered = []
                 for s in filtered:
@@ -142,8 +142,8 @@ class PairlistManager:
                     filt_desc.append(f"spread({removed} removed)")
 
             # Age filter
-            if isinstance(filters_cfg, dict) and filters_cfg.get("age_enabled", False):
-                min_candles = int(filters_cfg.get("age_min_candles", 200))
+            if isinstance(filters_cfg, dict) and filters_cfg["age_enabled"]:
+                min_candles = int(filters_cfg["age_min_candles"])
                 before = len(filtered)
                 age_filtered = []
                 for s in filtered:

@@ -11,7 +11,7 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# ── MT5 Account / Trade Helpers (used by dashboard.py) ────
+# ── MT5 Account / Trade Helpers ────
 
 def get_account_info() -> Dict[str, float]:
     """Get MT5 account balance info as dict."""
@@ -55,7 +55,7 @@ def get_symbol_trade_info(symbol: str) -> Dict[str, Any]:
         return {'trade_mode': None, 'volume_min': 0.01, 'volume_step': 0.01, 'digits': 2}
 
 
-def get_trade_history(days: int = 30, limit: int = 50) -> List[Dict[str, Any]]:
+def get_trade_history(days: int, limit: int) -> List[Dict[str, Any]]:
     """Get MT5 historical closed trades as list of dicts."""
     try:
         import MetaTrader5 as mt5
@@ -84,9 +84,9 @@ def get_trade_history(days: int = 30, limit: int = 50) -> List[Dict[str, Any]]:
 
 
 def validate_volume(volume: float,
-                    volume_min: float = 0.01,
-                    volume_max: float = 100.0,
-                    volume_step: float = 0.01) -> float:
+                    volume_min: float,
+                    volume_max: float,
+                    volume_step: float) -> float:
     """Round *volume* to nearest *volume_step* and clamp to broker limits."""
     if volume <= 0:
         return volume_min
@@ -95,7 +95,7 @@ def validate_volume(volume: float,
     return max(volume_min, min(volume, volume_max))
 
 
-def normalise_price(price: float, digits: int = 2) -> float:
+def normalise_price(price: float, digits: int) -> float:
     """Round price to the given number of decimal places."""
     return round(price, digits)
 
@@ -105,7 +105,7 @@ def validate_sltp_distance(entry: float,
                            tp: Optional[float],
                            min_stops: int,
                            point: float,
-                           digits: int = 2) -> Tuple[Optional[float], Optional[float]]:
+                           digits: int) -> Tuple[Optional[float], Optional[float]]:
     """Enforce broker minimum stops level distance for SL/TP."""
     if min_stops <= 0 or point <= 0:
         return sl, tp
@@ -129,11 +129,11 @@ def validate_sltp_distance(entry: float,
     return sl, tp
 
 
-def default_sl(price: float, side: str, pct: float = 0.015) -> float:
+def default_sl(price: float, side: str, pct: float) -> float:
     """Default stop-loss 1.5% away from entry."""
     return price * (1 - pct) if side.upper() == "BUY" else price * (1 + pct)
 
 
-def default_tp(price: float, side: str, pct: float = 0.03) -> float:
+def default_tp(price: float, side: str, pct: float) -> float:
     """Default take-profit 3% away from entry."""
     return price * (1 + pct) if side.upper() == "BUY" else price * (1 - pct)

@@ -58,7 +58,7 @@ class TelegramRPC(IRPC):
 
     # ── Send ──────────────────────────────────────────────────
 
-    def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
+    def send_message(self, message: str, parse_mode: str) -> bool:
         if not self.bot_token or not self.chat_id:
             return False
         try:
@@ -98,7 +98,7 @@ class TelegramRPC(IRPC):
                     self._process_update(update)
                     self._last_update_id = update.get("update_id", 0)
             except Exception as e:
-                logger.debug(f"Telegram poll error: {e}")
+                logger.warning(f"Telegram poll error: {e}")
             time.sleep(interval)
 
     def _fetch_updates(self) -> List[Dict[str, Any]]:
@@ -124,10 +124,8 @@ class TelegramRPC(IRPC):
         text = (msg.get("text") or "").strip()
 
         # ── Authorisation ──────────────────────────────────────
-        if self._allowed_chat_ids and chat_id not in self._allowed_chat_ids:
-            logger.warning(f"Unauthorised Telegram command from {chat_id}")
-            cmd_only = text.split()[0] if text else ""
-            self._send_to_chat(chat_id, f"⛔ Unauthorised. Allowed: {self._allowed_chat_ids}")
+        if self._allowed_chat_ids and str(chat_id) not in [str(x) for x in self._allowed_chat_ids]:
+            logger.warning(f"Ignored unauthorised Telegram command from {chat_id}: {text[:50]}")
             return
 
         if not text:

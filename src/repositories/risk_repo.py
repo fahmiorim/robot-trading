@@ -37,7 +37,7 @@ class RiskRepository:
         if data:
             try:
                 return RiskState(
-                    symbol=data.get("symbol", "XAUUSD"),
+                    symbol=data.get("symbol", ""),
                     initial_balance=float(data["initial_balance"]) if data.get("initial_balance") is not None else None,
                     peak_balance=float(data["peak_balance"]) if data.get("peak_balance") is not None else None,
                     daily_start_balance=float(data["daily_start_balance"]) if data.get("daily_start_balance") is not None else None,

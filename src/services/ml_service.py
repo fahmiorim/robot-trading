@@ -1,11 +1,15 @@
 """ML service — ML model training and prediction orchestration."""
 
-from typing import Optional
+from __future__ import annotations
+from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
 from src.ml.trainer import Trainer
 from src.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from src.configuration.manager import ConfigManager
 
 logger = get_logger(__name__)
 
@@ -20,11 +24,17 @@ class MLService:
         pred = service.predict(data)
     """
 
-    def __init__(self, model_type: str = "random_forest",
-                 retrain_interval_hours: int = 24):
+    def __init__(self, model_type: str,
+                 retrain_interval_hours: int,
+                 model_path: Optional[str] = None,
+                 config: Optional['ConfigManager'] = None):
+        if model_path is None:
+            model_path = "trained_models/latest_model.pkl"
         self.trainer = Trainer(
             model_type=model_type,
             retrain_interval_hours=retrain_interval_hours,
+            model_path=model_path,
+            config=config,
         )
 
     def ensure_trained(self, data: pd.DataFrame) -> float:
@@ -51,6 +61,10 @@ class MLService:
     @property
     def is_trained(self) -> bool:
         return self.trainer.is_trained
+
+    @property
+    def last_train_stats(self) -> Optional[dict]:
+        return self.trainer.last_train_stats
 
     @property
     def last_accuracy(self) -> Optional[float]:

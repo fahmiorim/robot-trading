@@ -1,7 +1,8 @@
 """AI Trading Robot Dashboard — Streamlit multi-page app.
 
 Usage:
-    streamlit run dashboard.py
+    streamlit run dashboard/__init__.py
+    python -m dashboard
 
 Startup flow:
   1. Quick DB connectivity check
@@ -12,6 +13,8 @@ Startup flow:
 import os
 import time
 import atexit
+import threading
+import textwrap
 from datetime import datetime
 
 import streamlit as st
@@ -30,21 +33,34 @@ from dashboard.helpers import cleanup_mt5
 logger = get_logger("dashboard")
 
 
+# Global bot instance to be shared across all sessions
+_global_robot = None
+_global_worker = None
+_global_lock = threading.Lock()
+
 def _init_session_state():
     """Initialize Streamlit session state variables."""
+    global _global_robot, _global_worker
+
     if "config" not in st.session_state:
         st.session_state.config = ConfigManager()
 
     config = st.session_state.config
 
-    if "robot" not in st.session_state:
-        st.session_state.robot = TradingController(config=config)
+    with _global_lock:
+        if _global_robot is None:
+            logger.info("Initializing global TradingController...")
+            _global_robot = TradingController(config=config)
+        
+        if _global_worker is None:
+            logger.info("Initializing global Worker...")
+            _global_worker = Worker(_global_robot)
+
+    st.session_state.robot = _global_robot
+    st.session_state.worker = _global_worker
 
     if "dashboard_ctrl" not in st.session_state:
         st.session_state.dashboard_ctrl = DashboardController(config=config)
-
-    if "worker" not in st.session_state:
-        st.session_state.worker = Worker(st.session_state.robot)
 
     defaults = {
         "mt5_initialized": False,
@@ -58,6 +74,11 @@ def _init_session_state():
         if k not in st.session_state:
             st.session_state[k] = v
 
+    # Start worker only after session state is fully initialized
+    with _global_lock:
+        if _global_worker is not None and config.get("general", "auto_trade"):
+            _global_worker.start()
+
 
 def _render_sidebar():
     """Render the premium sidebar with navigation and status."""
@@ -65,13 +86,13 @@ def _render_sidebar():
 
     with st.sidebar:
         # Brand header — glassmorphism premium
-        st.markdown("""
+        st.markdown(textwrap.dedent("""
         <div style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.03)); backdrop-filter: blur(10px); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 14px; padding: 1.2rem 1.1rem; margin-bottom: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
             <div style="font-size: 2.3rem; line-height: 1; margin-bottom: 0.5rem; filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.5));">🤖</div>
             <div style="font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AI Trading Robot</div>
             <div style="font-size: 0.62rem; opacity: 0.45; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.3rem; font-weight: 600; color: #a5b4fc;">v2.0 • Automated Swarm System</div>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
 
         # Navigation
         page_labels = ["📊 Dashboard", "📈 Charts", "📊 Performance", "⚙️ Settings", "ℹ️ About"]
@@ -82,15 +103,33 @@ def _render_sidebar():
         )
         page = selected
 
+        # Concept drift alert banner (visible only when active)
+        try:
+            robot = st.session_state.get("robot")
+            if robot and getattr(robot, 'ml_service', None) and robot.ml_service.trainer.concept_drifted:
+                st.markdown(textwrap.dedent("""
+                <div style="font-family: 'Outfit', sans-serif; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 0.7rem 1rem; margin-top: 0.5rem; margin-bottom: 0.5rem; box-shadow: 0 0 20px rgba(239, 68, 68, 0.08);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.2rem;">🚨</span>
+                        <div>
+                            <div style="font-size: 0.7rem; font-weight: 800; color: #fca5a5; letter-spacing: 0.05em; text-transform: uppercase;">Concept Drift</div>
+                            <div style="font-size: 0.6rem; opacity: 0.8; color: #fef2f2; margin-top: 2px;">Akurasi ML turun drastis — retrain otomatis.</div>
+                        </div>
+                    </div>
+                </div>
+                """), unsafe_allow_html=True)
+        except Exception:
+            pass
+
         # System info footer
-        st.markdown(f"""
-        <div style="margin-top: 1rem; padding: 0.6rem 0.8rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+        st.markdown(textwrap.dedent(f"""
+        <div style="margin-top: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
             <div style="font-size: 0.6rem; opacity: 0.35; line-height: 1.8;">
                 <div>🕐 {datetime.now().strftime('%H:%M:%S')} UTC</div>
                 <div>⚙️ Database config</div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
 
     return page
 

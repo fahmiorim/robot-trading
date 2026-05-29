@@ -27,7 +27,8 @@ class SignalService:
                    current_regime: str = "unknown",
                    use_ml: bool = False,
                    use_agent: bool = False,
-                   use_swarm: bool = False) -> int:
+                   use_swarm: bool = False,
+                   config: Optional[Any] = None) -> int:
         """Compute aggregated signal from all enabled sources.
 
         Returns:
@@ -48,27 +49,37 @@ class SignalService:
 
         # 3. Agent signal
         if use_agent:
-            agent_sig = self._agent_signal(data)
+            agent_sig = self._agent_signal(data, config)
             votes["agent"] = agent_sig
             self._last_signals["agent"] = agent_sig
 
         # 4. Swarm signal
         if use_swarm:
-            swarm_sig = self._swarm_signal(data)
+            swarm_sig = self._swarm_signal(data, config)
             votes["swarm"] = swarm_sig
             self._last_signals["swarm"] = swarm_sig
 
         # Consensus voting
-        buy = sum(1 for v in votes.values() if v == 1)
-        sell = sum(1 for v in votes.values() if v == -1)
+        buy_votes = sum(1 for v in votes.values() if v == 1)
+        sell_votes = sum(1 for v in votes.values() if v == -1)
         total = len(votes)
 
         if total == 0:
             return SignalType.HOLD
 
-        if buy > total / 2:
+        buy_ratio = buy_votes / total
+        sell_ratio = sell_votes / total
+
+        # Use thresholds from config if provided, else default to majority
+        buy_threshold = 0.5
+        sell_threshold = 0.5
+        if config:
+            buy_threshold = config.get("signals", "consensus_buy_threshold")
+            sell_threshold = abs(config.get("signals", "consensus_sell_threshold"))
+
+        if buy_ratio >= buy_threshold:
             return SignalType.BUY
-        elif sell > total / 2:
+        elif sell_ratio >= sell_threshold:
             return SignalType.SELL
         return SignalType.HOLD
 
@@ -113,20 +124,20 @@ class SignalService:
             logger.warning(f"ML signal failed: {e}")
         return SignalType.HOLD
 
-    def _agent_signal(self, data: pd.DataFrame) -> int:
+    def _agent_signal(self, data: pd.DataFrame, config: Optional[Any] = None) -> int:
         """Get signal from AI agent (placeholder)."""
         try:
             from src.ml.agent_pipeline import get_agent_signal
-            return get_agent_signal(data)
-        except Exception:
-            pass
+            return get_agent_signal(data, config=config)
+        except Exception as e:
+            logger.warning(f"Agent signal failed: {e}")
         return SignalType.HOLD
 
-    def _swarm_signal(self, data: pd.DataFrame) -> int:
+    def _swarm_signal(self, data: pd.DataFrame, config: Optional[Any] = None) -> int:
         """Get signal from swarm intelligence (placeholder)."""
         try:
             from src.ml.swarm_intelligence import get_swarm_signal
-            return get_swarm_signal(data)
-        except Exception:
-            pass
+            return get_swarm_signal(data, config=config)
+        except Exception as e:
+            logger.warning(f"Swarm signal failed: {e}")
         return SignalType.HOLD

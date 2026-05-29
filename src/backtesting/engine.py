@@ -21,6 +21,11 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+RANDOM_SEED = 42
+MIN_POSITION_SIZE = 0.01
+ANNUALIZE_THRESHOLD_YEARS = 0.1
+
+
 class Backtester:
     """Backtesting engine with realistic trade simulation.
 
@@ -47,6 +52,8 @@ class Backtester:
             "risk_management", "trailing_stop_activation_pct")
         self.trailing_distance_pct = config.get(
             "risk_management", "trailing_stop_distance_pct")
+        self.risk_free_rate = config.get("performance", "risk_free_rate")
+        self.periods_per_year = config.get("performance", "periods_per_year")
         self.results: Dict[str, Dict] = {}
 
     def run(self, data: pd.DataFrame, signals: pd.Series,
@@ -62,7 +69,7 @@ class Backtester:
             Dict with metrics (return, trades, drawdown, sharpe, sortino, calmar,
             CAGR, SQN, profit_factor, streaks, time_in_market, monthly_returns, etc.).
         """
-        rng = np.random.RandomState(42 + hash(strategy_name) % 10000)
+        rng = np.random.RandomState(RANDOM_SEED + hash(strategy_name) % 10000)
         balance = self.initial_balance
         equity_curve = [balance]
         trades: List[Dict] = []
@@ -71,6 +78,7 @@ class Backtester:
         position_size = 0.0
         trailing_sl = 0.0
         last_sl = self.sl_pct
+        entry_time = None
 
         for i in range(len(data)):
             price = float(data["close"].iloc[i])
@@ -99,25 +107,28 @@ class Backtester:
                             "price": trailing_sl,
                             "profit_pct": (trailing_sl - entry_price) / entry_price * 100,
                             "profit": pnl - comm - (position_size * entry_price),
-                            "entry_time": data.index[i - 1] if i > 0 else data.index[i],
+                            "entry_time": entry_time,
                         })
                         position = 0
                         position_size = 0.0
                         entry_price = 0.0
                         trailing_sl = 0.0
+                        entry_time = None
                         last_sl = self.sl_pct
                         equity_curve.append(balance)
                         continue
 
                 pnl = self._check_sltp(position, entry_price, high, low,
                                        price, position_size, trades, data.index[i],
-                                       sl_pct=last_sl, entry_already_deducted=True)
+                                       sl_pct=last_sl, entry_already_deducted=True,
+                                       entry_time=entry_time)
                 if pnl is not None:
                     balance += pnl
                     position = 0
                     position_size = 0.0
                     entry_price = 0.0
                     trailing_sl = 0.0
+                    entry_time = None
                     last_sl = self.sl_pct
                     equity_curve.append(balance)
                     continue
@@ -125,24 +136,24 @@ class Backtester:
             # Signal processing
             if signal == 1 and position <= 0:
                 if position < 0:
-                    pnl = position_size * (entry_price - price)
                     comm = price * position_size * (self.commission_pct / 100.0)
-                    profit_val = pnl - comm
-                    balance += profit_val
+                    profit_val = (entry_price - price) * position_size - comm
+                    balance -= price * position_size + comm
                     trades.append({
                         "time": data.index[i], "action": "BUY (cover)",
                         "price": price,
                         "profit_pct": (entry_price - price) / entry_price * 100,
                         "profit": profit_val,
-                        "entry_time": data.index[i - 1] if i > 0 else data.index[i],
+                        "entry_time": entry_time,
                     })
                     position = 0
                     position_size = 0.0
+                    entry_time = None
 
                 # Open long — track cost basis
                 risk_amt = balance * (self.position_size_pct / 100.0)
                 pos_size = risk_amt / price if price > 0 else 0.01
-                pos_size = max(0.01, round(pos_size, 4))
+                pos_size = max(MIN_POSITION_SIZE, round(pos_size, 4))
                 slippage = price * (self.slippage_pct / 100.0) * rng.uniform(-1, 1)
                 entry_price = price + slippage
                 position_size = pos_size
@@ -151,10 +162,11 @@ class Backtester:
                 position = 1
                 trailing_sl = 0.0
                 last_sl = self.sl_pct
+                entry_time = data.index[i]
                 trades.append({
                     "time": data.index[i], "action": "BUY",
                     "price": entry_price, "size": position_size,
-                    "entry_time": data.index[i],
+                    "entry_time": entry_time,
                 })
 
             elif signal == -1 and position >= 0:
@@ -168,27 +180,29 @@ class Backtester:
                         "price": price,
                         "profit_pct": (price - entry_price) / entry_price * 100,
                         "profit": profit_val - (position_size * entry_price),
-                        "entry_time": data.index[i - 1] if i > 0 else data.index[i],
+                        "entry_time": entry_time,
                     })
                     position = 0
                     position_size = 0.0
                     trailing_sl = 0.0
+                    entry_time = None
                     last_sl = self.sl_pct
 
                 # Open short
                 risk_amt = balance * (self.position_size_pct / 100.0)
                 pos_size = risk_amt / price if price > 0 else 0.01
-                pos_size = max(0.01, round(pos_size, 4))
+                pos_size = max(MIN_POSITION_SIZE, round(pos_size, 4))
                 slippage = price * (self.slippage_pct / 100.0) * rng.uniform(-1, 1)
                 entry_price = price + slippage
                 position_size = pos_size
                 comm = entry_price * position_size * (self.commission_pct / 100.0)
-                balance -= comm
+                balance += entry_price * position_size - comm
                 position = -1
+                entry_time = data.index[i]
                 trades.append({
                     "time": data.index[i], "action": "SELL (short)",
                     "price": entry_price, "size": position_size,
-                    "entry_time": data.index[i],
+                    "entry_time": entry_time,
                 })
 
             # Track equity
@@ -202,20 +216,20 @@ class Backtester:
                 # For long: just proceeds (cost already deducted from balance at entry)
                 pnl = position_size * last_price
             else:
-                # For short: profit (no principal was deducted at entry)
-                pnl = position_size * (entry_price - last_price)
+                # For short: buy back at last price (balance has proceeds)
+                pnl = -position_size * last_price
             comm = last_price * position_size * (self.commission_pct / 100.0)
             balance += pnl - comm
             equity_curve[-1] = balance
             pnl_pct = (last_price - entry_price) / entry_price * 100 if position == 1 \
                 else (entry_price - last_price) / entry_price * 100
-            trade_profit = pnl - comm - (position_size * entry_price if position == 1 else 0)
+            trade_profit = pnl - comm - (position_size * entry_price if position == 1 else -position_size * entry_price)
             trades.append({
                 "time": data.index[-1], "action": f"CLOSE {'LONG' if position == 1 else 'SHORT'} (end)",
                 "price": last_price,
                 "profit_pct": pnl_pct,
                 "profit": trade_profit,
-                "entry_time": trades[-1]["time"] if trades else data.index[-1],
+                "entry_time": entry_time or data.index[-1],
             })
 
         total_return = (balance - self.initial_balance) / self.initial_balance * 100
@@ -232,19 +246,47 @@ class Backtester:
 
         proper_trades = []
         for t in trades:
-            profit_val = t.get("profit", t.get("profit_pct", 0))
-            if not isinstance(profit_val, (int, float)):
-                profit_val = 0.0
-            proper_trades.append({
-                "profit": float(profit_val),
-                "entry_time": t.get("entry_time"),
-                "exit_time": t.get("time"),
-            })
+            if "profit" in t or "profit_pct" in t:
+                profit_val = t.get("profit", t.get("profit_pct", 0))
+                if not isinstance(profit_val, (int, float)):
+                    profit_val = 0.0
+                proper_trades.append({
+                    "profit": float(profit_val),
+                    "entry_time": t.get("entry_time"),
+                    "exit_time": t.get("time"),
+                })
 
         # ── Advanced Metrics ──
         returns = [t.get("profit", 0) / self.initial_balance for t in proper_trades]
-        sharpe = calculate_sharpe_ratio(returns)
-        sortino = calculate_sortino_ratio(returns)
+        data_span_hours = (data.index[-1] - data.index[0]).total_seconds() / 3600 \
+            if len(data) > 1 else 1.0
+        data_years = data_span_hours / (365.25 * 24)
+        if len(returns) >= 2:
+            arr = np.array(returns)
+            r_mean = float(np.mean(arr))
+            r_std = float(np.std(arr))
+            if r_std > 0:
+                if data_years >= ANNUALIZE_THRESHOLD_YEARS:  # ≥ threshold → annualized
+                    annual_factor = (len(returns) / max(data_years, 0.001)) ** 0.5
+                    sharpe = round(r_mean / r_std * annual_factor, 3)
+                    downside = arr[arr < 0]
+                    if len(downside) > 0 and np.std(downside) > 0:
+                        sortino = round(r_mean / float(np.std(downside)) * annual_factor, 3)
+                    else:
+                        sortino = 0.0
+                else:  # < 1 bulan → raw (non-annualized)
+                    sharpe = round(r_mean / r_std, 3)
+                    downside = arr[arr < 0]
+                    if len(downside) > 0 and np.std(downside) > 0:
+                        sortino = round(r_mean / float(np.std(downside)), 3)
+                    else:
+                        sortino = 0.0
+            else:
+                sharpe = 0.0
+                sortino = 0.0
+        else:
+            sharpe = 0.0
+            sortino = 0.0
         pf = calculate_profit_factor(proper_trades)
         calmar = calculate_calmar_ratio(total_return, max_dd, 1.0)
 
@@ -370,7 +412,7 @@ class Backtester:
     # ── Internal helpers ──────────────────────────────────────
 
     def _check_sltp(self, position, entry, high, low, price, size, trades, idx,
-                    sl_pct=None, entry_already_deducted=False):
+                    sl_pct=None, entry_already_deducted=False, entry_time=None):
         sl_pct = sl_pct or self.sl_pct
         tp_pct = self.tp_pct
 
@@ -380,38 +422,48 @@ class Backtester:
             if low <= sl:
                 pnl = size * sl
                 comm = sl * size * (self.commission_pct / 100.0)
+                profit_val = pnl - comm - (size * entry)
                 trades.append({"time": idx, "action": "SELL (SL)",
                                "price": sl,
                                "profit_pct": (sl - entry) / entry * 100,
-                               "entry_time": idx})
+                               "profit": profit_val,
+                               "entry_time": entry_time or idx})
                 return pnl - comm - (size * entry if not entry_already_deducted else 0)
             elif high >= tp:
                 pnl = size * tp
                 comm = tp * size * (self.commission_pct / 100.0)
+                profit_val = pnl - comm - (size * entry)
                 trades.append({"time": idx, "action": "SELL (TP)",
                                "price": tp,
                                "profit_pct": (tp - entry) / entry * 100,
-                               "entry_time": idx})
+                               "profit": profit_val,
+                               "entry_time": entry_time or idx})
                 return pnl - comm - (size * entry if not entry_already_deducted else 0)
         else:
             sl = entry * (1 + sl_pct / 100.0)
             tp = entry * (1 - tp_pct / 100.0)
             if high >= sl:
-                pnl = size * (entry - sl)
                 comm = sl * size * (self.commission_pct / 100.0)
+                profit_val = (entry - sl) * size - comm
                 trades.append({"time": idx, "action": "BUY (SL)",
                                "price": sl,
                                "profit_pct": (entry - sl) / entry * 100,
-                               "entry_time": idx})
-                return pnl - comm
+                               "profit": profit_val,
+                               "entry_time": entry_time or idx})
+                if entry_already_deducted:
+                    return -sl * size - comm
+                return profit_val
             elif low <= tp:
-                pnl = size * (entry - tp)
                 comm = tp * size * (self.commission_pct / 100.0)
+                profit_val = (entry - tp) * size - comm
                 trades.append({"time": idx, "action": "BUY (TP)",
                                "price": tp,
                                "profit_pct": (entry - tp) / entry * 100,
-                               "entry_time": idx})
-                return pnl - comm
+                               "profit": profit_val,
+                               "entry_time": entry_time or idx})
+                if entry_already_deducted:
+                    return -tp * size - comm
+                return profit_val
         return None
 
     @staticmethod
@@ -419,7 +471,7 @@ class Backtester:
         if position == 1 and size > 0:
             return balance + size * price
         elif position == -1 and size > 0:
-            return balance + size * (entry - price)
+            return balance - size * price
         return balance
 
     @staticmethod

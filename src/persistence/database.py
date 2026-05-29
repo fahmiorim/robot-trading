@@ -15,6 +15,7 @@ import json
 import os
 import time
 import random
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -54,13 +55,14 @@ def get_db() -> "DatabaseManager":
 def _load_db_config() -> Dict[str, Any]:
     """Build DB connection dict from environment variables."""
     return {
-        "host": os.getenv("DB_HOST", "127.0.0.1"),
-        "port": int(os.getenv("DB_PORT", "3306")),
-        "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", ""),
-        "database": os.getenv("DB_NAME", "trading_bot"),
+        "host": os.getenv("DB_HOST"),
+        "port": int(os.getenv("DB_PORT")),
+        "user": os.getenv("DB_USER"),
+        "password": os.getenv("DB_PASSWORD"),
+        "database": os.getenv("DB_NAME"),
         "charset": "utf8mb4",
         "use_pure": True,
+        "ssl_disabled": True,
     }
 
 
@@ -81,11 +83,26 @@ class DatabaseManager(
         - RiskStateMixin   (risk state persistence)
     """
 
+    _schema_lock = threading.Lock()
+    _tables_ensured = False
+
     def __init__(self):
-        self._connection: Optional[MySQLConnection] = None
-        self._settings_seeded: bool = False
+        self._local = threading.local()
+
         self._reconnect_delay: float = 1.0
         self._max_reconnect_delay: float = 30.0
+
+    @property
+    def _connection(self) -> Optional[MySQLConnection]:
+        if not hasattr(self, '_local'):
+            self._local = threading.local()
+        return getattr(self._local, 'connection', None)
+
+    @_connection.setter
+    def _connection(self, value: Optional[MySQLConnection]):
+        if not hasattr(self, '_local'):
+            self._local = threading.local()
+        self._local.connection = value
 
     # ── Connection ───────────────────────────────────────────
 
@@ -152,7 +169,7 @@ class DatabaseManager(
         "risk_state": """
             CREATE TABLE IF NOT EXISTS risk_state (
                 id INT PRIMARY KEY DEFAULT 1,
-                symbol VARCHAR(20) NOT NULL DEFAULT 'XAUUSD',
+                symbol VARCHAR(20) NOT NULL,
                 initial_balance DECIMAL(15,2),
                 peak_balance DECIMAL(15,2),
                 daily_start_balance DECIMAL(15,2),
@@ -294,6 +311,28 @@ class DatabaseManager(
                 INDEX idx_score (best_score DESC)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """,
+        "ml_training_log": """
+            CREATE TABLE IF NOT EXISTS ml_training_log (
+                id                  INT AUTO_INCREMENT PRIMARY KEY,
+                trained_at          DATETIME NOT NULL,
+                model_type          VARCHAR(30) NOT NULL,
+                accuracy            DECIMAL(6,4),
+                params_used         JSON,
+                class_distribution  JSON,
+                feature_importance  JSON,
+                n_samples           INT,
+                data_range_start    DATETIME,
+                data_range_end      DATETIME,
+                atr_multiplier      DECIMAL(5,2),
+                threshold           DECIMAL(6,4),
+                data_source         VARCHAR(30) DEFAULT 'mt5',
+                symbol              VARCHAR(20),
+                timeframe           VARCHAR(20),
+                created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_trained_at (trained_at),
+                INDEX idx_model_type (model_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """,
         "settings": """
             CREATE TABLE IF NOT EXISTS settings (
                 section     VARCHAR(50) NOT NULL,
@@ -314,33 +353,41 @@ class DatabaseManager(
         Each operation is wrapped in its own try/except so one
         failure does not cascade and block other table creation.
         """
-        cursor = self._connection.cursor()
-        db_name = self._connection.database
+        if DatabaseManager._tables_ensured:
+            return
 
-        # 1. CREATE ALL CORE TABLES (each in its own try/except — settings table
-        #    must exist before seed_settings() is called later in _load_from_db())
-        for table_name, ddl in self._SCHEMA_TABLES.items():
+        with DatabaseManager._schema_lock:
+            if DatabaseManager._tables_ensured:
+                return
+
+            cursor = self._connection.cursor()
+            db_name = self._connection.database
+
+            # 1. CREATE ALL CORE TABLES (each in its own try/except — settings table
+            #    must exist before seed_settings() is called later in _load_from_db())
+            for table_name, ddl in self._SCHEMA_TABLES.items():
+                try:
+                    cursor.execute(ddl)
+                    logger.debug(f"Table '{table_name}' ensured")
+                except Exception as e:
+                    logger.error(f"Could not create table '{table_name}': {e} — data for this table will not be saved!")
+
+            # 2. ALTER operations (column additions, indexes)
             try:
-                cursor.execute(ddl)
-                logger.debug(f"Table '{table_name}' ensured")
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                      AND TABLE_NAME = 'trade_history'
+                      AND COLUMN_NAME = 'paper_trade'
+                """, (db_name,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("ALTER TABLE trade_history ADD COLUMN paper_trade TINYINT(1) DEFAULT 0")
+                    cursor.execute("CREATE INDEX idx_paper_trade ON trade_history (paper_trade)")
             except Exception as e:
-                logger.warning(f"Could not create table '{table_name}': {e}")
+                logger.warning(f"Could not add paper_trade column: {e}")
 
-        # 2. ALTER operations (column additions, indexes)
-        try:
-            cursor.execute("""
-                SELECT COUNT(*) FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = %s
-                  AND TABLE_NAME = 'trade_history'
-                  AND COLUMN_NAME = 'paper_trade'
-            """, (db_name,))
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("ALTER TABLE trade_history ADD COLUMN paper_trade TINYINT(1) DEFAULT 0")
-                cursor.execute("CREATE INDEX idx_paper_trade ON trade_history (paper_trade)")
-        except Exception as e:
-            logger.warning(f"Could not add paper_trade column: {e}")
-
-        cursor.close()
+            cursor.close()
+            DatabaseManager._tables_ensured = True
 
     def disconnect(self):
         if self._connection and self._connection.is_connected():

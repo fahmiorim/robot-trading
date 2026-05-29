@@ -21,7 +21,7 @@ class MarketDataRepository:
     def __init__(self, db):
         self._db = db
 
-    def load(self, symbol: str, timeframe: str, limit: int = 1000) -> Optional[pd.DataFrame]:
+    def load(self, symbol: str, timeframe: str, limit: int) -> Optional[pd.DataFrame]:
         """Load cached market data from database."""
         return self._db.load_market_data(symbol, timeframe, limit=limit)
 
@@ -29,7 +29,7 @@ class MarketDataRepository:
         """Save market data to database cache."""
         return self._db.save_market_data(symbol, timeframe, df)
 
-    def delete_old(self, symbol: str, timeframe: str, keep_count: int = 5000) -> bool:
+    def delete_old(self, symbol: str, timeframe: str, keep_count: int) -> bool:
         """Delete old candles, keeping only the most recent keep_count."""
         try:
             df = self.load(symbol, timeframe, limit=keep_count + 100)

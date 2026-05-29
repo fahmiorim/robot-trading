@@ -34,13 +34,17 @@ class MT5Exchange(IExchange):
     _initialized: bool = False
     _subscribed_symbols: Set[str] = set()
 
-    def __init__(self, symbol: str = "XAUUSD",
-                 magic_number: int = 2024,
+    def __init__(self, symbol: str,
+                 magic_number: int,
+                 default_sl_pct: float,
+                 default_tp_pct: float,
                  max_retries: int = 3,
-                 retry_delay: float = 2.0,
-                 reconnect_interval: int = 30):
+                 retry_delay: float = 1.0,
+                 reconnect_interval: int = 60):
         self.symbol = symbol
         self.magic_number = magic_number
+        self.default_sl_pct = default_sl_pct
+        self.default_tp_pct = default_tp_pct
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.reconnect_interval = reconnect_interval
@@ -116,9 +120,19 @@ class MT5Exchange(IExchange):
     def _subscribe_symbol(self, symbol: str) -> bool:
         """Add a symbol to Market Watch so tick data is received."""
         try:
+            # First check if it is already selected
+            info = mt5.symbol_info(symbol)
+            if info is not None and info.select:
+                MT5Exchange._subscribed_symbols.add(symbol)
+                return True
+                
             ok = mt5.symbol_select(symbol, True)
             if ok:
                 MT5Exchange._subscribed_symbols.add(symbol)
+            else:
+                # Try to see if it even exists
+                if mt5.symbol_info(symbol) is None:
+                    logger.error(f"Symbol {symbol} not found in terminal")
             return ok
         except Exception as e:
             logger.error(f"Error subscribing to {symbol}: {e}")
@@ -161,9 +175,19 @@ class MT5Exchange(IExchange):
         if not self.ensure_connection():
             raise ConnectionError("MT5 not connected")
 
-        rates = mt5.copy_rates_from_pos(symbol, tf_value, 0, count)
+        # Ensure symbol is selected
+        self._subscribe_symbol(symbol)
+
+        rates = None
+        for attempt in range(3):
+            rates = mt5.copy_rates_from_pos(symbol, tf_value, 0, count)
+            if rates is not None and len(rates) > 0:
+                break
+            logger.warning(f"No OHLCV data for {symbol} (attempt {attempt+1}), retrying...")
+            time.sleep(0.5)
+
         if rates is None or len(rates) == 0:
-            raise ConnectionError(f"No data received for {symbol}")
+            raise ConnectionError(f"No data received for {symbol} after retries. Terminal might be syncing.")
 
         df = pd.DataFrame(rates)
         df['time'] = pd.to_datetime(df['time'], unit='s')
@@ -176,15 +200,33 @@ class MT5Exchange(IExchange):
         return df
 
     def fetch_ticker(self, symbol: str) -> Dict[str, float]:
-        """Get current bid/ask prices."""
+        """Get current bid/ask prices and daily volume info."""
         tick = self._get_tick(symbol)
         if tick is None:
-            return {'bid': 0.0, 'ask': 0.0, 'last': 0.0, 'time': 0}
+            # Try a direct symbol_info_tick call if the tracked set failed
+            tick = mt5.symbol_info_tick(symbol)
+            
+        if tick is None:
+            return {'bid': 0.0, 'ask': 0.0, 'last': 0.0, 'time': 0, 'symbol': symbol, 'volume': 0.0, 'quoteVolume': 0.0}
+
+        vol = 0.0
+        quote_vol = 0.0
+        try:
+            info = mt5.symbol_info(symbol)
+            if info is not None:
+                vol = float(getattr(info, 'session_volume', 0.0) or getattr(info, 'volume24h', 0.0))
+                quote_vol = float(getattr(info, 'session_turnover', 0.0) or (vol * float(tick.last or tick.bid or 0.0)))
+        except Exception:
+            pass
+
         return {
             'bid': float(tick.bid),
             'ask': float(tick.ask),
             'last': float(tick.last),
             'time': int(tick.time),
+            'symbol': symbol,
+            'volume': vol,
+            'quoteVolume': quote_vol
         }
 
     def _get_tick(self, symbol: str):
@@ -212,6 +254,15 @@ class MT5Exchange(IExchange):
 
         # Resolve order side
         is_buy = side.upper() == "BUY"
+        
+        # Validate/align volume to step and limits
+        info = self.get_symbol_info(symbol)
+        volume = self.validate_volume(
+            volume,
+            volume_min=info.get('volume_min', 0.01),
+            volume_max=info.get('volume_max', 100.0),
+            volume_step=info.get('volume_step', 0.01)
+        )
         mt5_type = mt5.ORDER_TYPE_BUY if is_buy else mt5.ORDER_TYPE_SELL
         tick = self._get_tick(symbol)
         if tick is None:
@@ -251,19 +302,19 @@ class MT5Exchange(IExchange):
                     sl, tp = self._validate_sltp_distance(symbol, entry_price, sl, tp)
 
             request = {
-                'action': mt5.TRADE_ACTION_DEAL,
-                'symbol': symbol,
-                'volume': volume,
-                'type': mt5_type,
-                'price': entry_price,
-                'sl': sl,
-                'tp': tp,
-                'deviation': 10,
-                'magic': self.magic_number,
-                'comment': kwargs.get('comment', 'AI Robot'),
+                'action': int(mt5.TRADE_ACTION_DEAL),
+                'symbol': str(symbol),
+                'volume': float(volume),
+                'type': int(mt5_type),
+                'price': float(entry_price),
+                'sl': float(sl) if sl is not None else 0.0,
+                'tp': float(tp) if tp is not None else 0.0,
+                'deviation': int(10),
+                'magic': int(self.magic_number),
+                'comment': str(kwargs.get('comment', 'AI Robot')),
             }
             if fill_mode is not None:
-                request['type_filling'] = fill_mode
+                request['type_filling'] = int(fill_mode)
 
             logger.info(f"Order #{attempt}/{self.max_retries}: {side} {volume} {symbol} "
                         f"@ {entry_price:.2f} fill={fill_label}")
@@ -274,7 +325,8 @@ class MT5Exchange(IExchange):
                 raise OrderError(f"order_send exception: {e}")
 
             if result is None:
-                raise OrderError("order_send returned None")
+                err = mt5.last_error()
+                raise OrderError(f"order_send returned None. MT5 last_error: {err}")
 
             retcode = result.retcode
             if retcode == mt5.TRADE_RETCODE_DONE:
@@ -367,18 +419,23 @@ class MT5Exchange(IExchange):
                 close_price = self._normalise_price(pos.symbol, close_price)
 
                 request = {
-                    'action': mt5.TRADE_ACTION_DEAL,
-                    'symbol': pos.symbol,
-                    'volume': pos.volume,
-                    'type': close_type,
-                    'position': ticket,
-                    'price': close_price,
-                    'deviation': 30,
-                    'magic': self.magic_number,
+                    'action': int(mt5.TRADE_ACTION_DEAL),
+                    'symbol': str(pos.symbol),
+                    'volume': float(pos.volume),
+                    'type': int(close_type),
+                    'position': int(ticket),
+                    'price': float(close_price),
+                    'deviation': int(30),
+                    'magic': int(self.magic_number),
                     'comment': 'Close',
                 }
+                fill_mode = get_best_filling_mode()
+                if fill_mode is not None:
+                    request['type_filling'] = int(fill_mode)
                 result = mt5.order_send(request)
                 if result is None:
+                    err = mt5.last_error()
+                    logger.error(f"order_send returned None closing position {ticket}. MT5 last_error: {err}")
                     continue
                 if result.retcode == mt5.TRADE_RETCODE_DONE:
                     logger.info(f"Position {ticket} closed")
@@ -443,6 +500,7 @@ class MT5Exchange(IExchange):
                 'digits': int(getattr(info, 'digits', 2)),
                 'point': float(getattr(info, 'point', 0.01)),
                 'trade_stops_level': int(getattr(info, 'trade_stops_level', 0)),
+                'contract_size': float(getattr(info, 'trade_contract_size', 100.0)),
             }
         except Exception as e:
             logger.error(f"Error getting symbol info: {e}")
@@ -478,6 +536,8 @@ class MT5Exchange(IExchange):
 
     def _normalise_price(self, symbol: str, price: float) -> float:
         """Round price to symbol digits to avoid MT5 error 10014."""
+        if price is None or price <= 0:
+            return 0.0
         info = self.get_symbol_info(symbol)
         digits = info.get('digits', 2)
         return round(price, digits)
@@ -486,6 +546,9 @@ class MT5Exchange(IExchange):
                                  sl: Optional[float],
                                  tp: Optional[float]):
         """Enforce broker minimum stops level distance."""
+        if sl is None and tp is None:
+            return sl, tp
+            
         info = self.get_symbol_info(symbol)
         min_stops = info.get('trade_stops_level', 0)
         point = info.get('point', 0.01)
@@ -495,18 +558,18 @@ class MT5Exchange(IExchange):
         min_dist = min_stops * point
         digits = info.get('digits', 2)
 
-        if sl is not None:
+        if sl is not None and sl > 0:
             dist = abs(entry - sl)
             if dist < min_dist:
                 adjusted = entry - min_dist if sl < entry else entry + min_dist
                 sl = round(adjusted, digits)
-                logger.warning(f"SL adjusted to {sl} (min dist {min_dist:.2f})")
-        if tp is not None:
+                logger.warning(f"SL adjusted to {sl} (min dist {min_dist:.{digits}f})")
+        if tp is not None and tp > 0:
             dist = abs(entry - tp)
             if dist < min_dist:
                 adjusted = entry + min_dist if tp > entry else entry - min_dist
                 tp = round(adjusted, digits)
-                logger.warning(f"TP adjusted to {tp} (min dist {min_dist:.2f})")
+                logger.warning(f"TP adjusted to {tp} (min dist {min_dist:.{digits}f})")
         return sl, tp
 
     @staticmethod
@@ -519,40 +582,6 @@ class MT5Exchange(IExchange):
         volume = round(volume / volume_step) * volume_step
         return max(volume_min, min(volume, volume_max))
 
-    # ── Position Modification ──────────────────────────────────
-
-    def modify_position(self, position_id: str, sl: Optional[float] = None,
-                        tp: Optional[float] = None) -> bool:
-        """Modify SL/TP on an open position."""
-        try:
-            ticket = int(position_id)
-            positions = mt5.positions_get(ticket=ticket)
-            if positions is None or len(positions) == 0:
-                return False
-            pos = positions[0]
-
-            request = {
-                'action': mt5.TRADE_ACTION_SLTP,
-                'position': ticket,
-                'symbol': pos.symbol,
-                'sl': sl if sl is not None else pos.sl,
-                'tp': tp if tp is not None else pos.tp,
-                'magic': self.magic_number,
-            }
-            # Normalise prices
-            if request['sl'] is not None:
-                request['sl'] = self._normalise_price(pos.symbol, request['sl'])
-            if request['tp'] is not None:
-                request['tp'] = self._normalise_price(pos.symbol, request['tp'])
-
-            result = mt5.order_send(request)
-            if result is None:
-                return False
-            return result.retcode == mt5.TRADE_RETCODE_DONE
-        except Exception as e:
-            logger.error(f"modify_position error: {e}")
-            return False
-
     def get_symbols(self) -> List[str]:
         """Return list of all trading symbols available in Market Watch."""
         try:
@@ -564,12 +593,8 @@ class MT5Exchange(IExchange):
             logger.error(f"get_symbols error: {e}")
             return []
 
-    @staticmethod
-    def _default_sl(price: float, side: str, pct: float = 0.005) -> float:
-        """Default stop-loss 0.5% away (adjusted for M1-M15)."""
-        return price * (1 - pct) if side.upper() == "BUY" else price * (1 + pct)
+    def _default_sl(self, price: float, side: str) -> float:
+        return price * (1 - self.default_sl_pct) if side.upper() == "BUY" else price * (1 + self.default_sl_pct)
 
-    @staticmethod
-    def _default_tp(price: float, side: str, pct: float = 0.01) -> float:
-        """Default take-profit 1% away (adjusted for M1-M15)."""
-        return price * (1 + pct) if side.upper() == "BUY" else price * (1 - pct)
+    def _default_tp(self, price: float, side: str) -> float:
+        return price * (1 + self.default_tp_pct) if side.upper() == "BUY" else price * (1 - self.default_tp_pct)

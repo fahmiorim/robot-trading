@@ -43,10 +43,11 @@ class AnalyticsRepository:
 
     def log_circuit_breaker(self, reason: str, drawdown_pct: Optional[float] = None,
                             balance_before: Optional[float] = None,
-                            balance_after: Optional[float] = None) -> Optional[int]:
-        return self._db.log_circuit_breaker(reason, drawdown_pct, balance_before, balance_after)
+                            balance_after: Optional[float] = None,
+                            cooldown_minutes: int = 120) -> Optional[int]:
+        return self._db.log_circuit_breaker(reason, drawdown_pct, balance_before, balance_after, cooldown_minutes)
 
-    def is_circuit_breaker_active(self, cooldown_minutes: int = 120) -> bool:
+    def is_circuit_breaker_active(self, cooldown_minutes: int) -> bool:
         return self._db.is_circuit_breaker_active(cooldown_minutes)
 
     # ── Hyperopt ──
@@ -96,11 +97,62 @@ class AnalyticsRepository:
                 logger.warning(f"Failed to parse hyperopt row: {e}")
         return results
 
+    # ── ML Training Log ──
+
+    def save_ml_training_log(self, log_data: Dict[str, Any]) -> bool:
+        """Persist an ML training run record."""
+        return self._db.save_ml_training_log(log_data)
+
+    def get_ml_training_log(self, limit: int = 20) -> List[Dict]:
+        """Get recent ML training runs."""
+        return self._db.get_ml_training_log(limit=limit)
+
+    def check_concept_drift(self, threshold_pct: float = 5.0) -> Dict[str, Any]:
+        """Check if latest training accuracy dropped >threshold_pct vs average of previous 3 runs.
+
+        Returns:
+            drifted: bool — True if concept drift detected
+            latest_acc: float — latest training accuracy
+            avg_prev_3: float — average accuracy of 3 runs before latest
+            drop_pct: float — percentage drop relative to avg_prev_3
+            n_available: int — number of training records available
+        """
+        logs = self.get_ml_training_log(limit=4)
+        result = {
+            "drifted": False,
+            "latest_acc": 0.0,
+            "avg_prev_3": 0.0,
+            "drop_pct": 0.0,
+            "n_available": len(logs),
+        }
+        if len(logs) < 4:
+            # Need at least 4 records (1 latest + 3 previous) to detect drift
+            return result
+
+        # logs are newest-first; latest is [0], previous 3 are [1:4]
+        latest = logs[0]
+        prev_3 = logs[1:4]
+
+        latest_acc = float(latest.get("accuracy", 0) or 0)
+        prev_accs = [float(r.get("accuracy", 0) or 0) for r in prev_3]
+        avg_prev = sum(prev_accs) / len(prev_accs)
+
+        if avg_prev > 0:
+            drop_pct = ((avg_prev - latest_acc) / avg_prev) * 100
+        else:
+            drop_pct = 0.0
+
+        result["latest_acc"] = latest_acc
+        result["avg_prev_3"] = avg_prev
+        result["drop_pct"] = round(drop_pct, 2)
+        result["drifted"] = drop_pct > threshold_pct
+        return result
+
     # ── Health Check ──
 
     def log_health_check(self, status: str, mt5_connected: bool,
+                         consecutive_errors: int,
                          last_cycle_seconds_ago: Optional[int] = None,
-                         consecutive_errors: int = 0,
                          error_message: Optional[str] = None) -> bool:
         return self._db.log_health_check(
             status=status, mt5_connected=mt5_connected,

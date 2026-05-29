@@ -69,7 +69,7 @@ def create_strategies_from_config(config: "ConfigManager") -> Dict[str, IStrateg
         params = config.get("strategies", name)
         if not isinstance(params, dict):
             continue
-        if not params.get("enabled", True):
+        if not params["enabled"]:
             continue
         filtered = {k: v for k, v in params.items() if k != "enabled"}
         strategies[name] = cls(**filtered)

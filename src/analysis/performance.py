@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 
 
-def calculate_sharpe_ratio(returns: List[float], risk_free_rate: float = 0.02,
-                           periods_per_year: int = 252) -> float:
+def calculate_sharpe_ratio(returns: List[float],
+                           risk_free_rate: float,
+                           periods_per_year: int) -> float:
     """Annualised Sharpe ratio."""
     if len(returns) < 2:
         return 0.0
@@ -24,26 +25,33 @@ def calculate_sharpe_ratio(returns: List[float], risk_free_rate: float = 0.02,
     return float(np.mean(excess) / np.std(excess) * np.sqrt(periods_per_year))
 
 
-def calculate_sortino_ratio(returns: List[float], risk_free_rate: float = 0.02,
-                            periods_per_year: int = 252) -> float:
+def calculate_sortino_ratio(returns: List[float],
+                            risk_free_rate: float,
+                            periods_per_year: int) -> float:
     """Annualised Sortino ratio (downside deviation only)."""
     if len(returns) < 2:
         return 0.0
     arr = np.array(returns)
-    excess = arr - (risk_free_rate / periods_per_year)
-    downside = arr[arr < 0]
-    if len(downside) == 0 or np.std(downside) == 0:
+    target = risk_free_rate / periods_per_year
+    excess = arr - target
+    # Downside deviation uses all returns, but only penalizes returns below target (or 0)
+    downside_diff = np.minimum(0, excess)
+    downside_deviation = np.sqrt(np.mean(downside_diff ** 2))
+    if downside_deviation == 0:
         return 0.0
-    return float(np.mean(excess) / np.std(downside) * np.sqrt(periods_per_year))
+    return float(np.mean(excess) / downside_deviation * np.sqrt(periods_per_year))
 
 
 def calculate_calmar_ratio(total_return_pct: float, max_drawdown_pct: float,
-                           years: float = 1.0) -> float:
+                           years: float) -> float:
     """Calmar ratio = annualised return / max drawdown."""
-    if max_drawdown_pct == 0:
+    if max_drawdown_pct == 0 or years <= 0 or total_return_pct <= -100.0:
         return 0.0
-    annualised = ((1 + total_return_pct / 100) ** (1 / years) - 1) * 100
-    return annualised / max_drawdown_pct
+    try:
+        annualised = ((1 + total_return_pct / 100) ** (1 / years) - 1) * 100
+        return annualised / max_drawdown_pct
+    except Exception:
+        return 0.0
 
 
 def calculate_max_drawdown(equity_curve: List[float]) -> Tuple[float, int, int]:
@@ -89,7 +97,7 @@ def calculate_avg_holding_time(trades: List[Dict]) -> timedelta:
     return timedelta(seconds=sum(durations) / len(durations))
 
 
-def build_equity_curve(trades: List[Dict], initial_balance: float = 10000.0) -> pd.DataFrame:
+def build_equity_curve(trades: List[Dict], initial_balance: float) -> pd.DataFrame:
     """Build equity curve from a list of trade dicts, sorted by exit_time."""
     df = pd.DataFrame(trades)
     if df.empty:
@@ -127,7 +135,7 @@ def calculate_sqn(returns: List[float]) -> float:
     return float(np.mean(returns) / np.std(returns) * np.sqrt(len(returns)))
 
 
-def calculate_expectancy(trades: List[Dict], initial_balance: float = 10000.0) -> Dict:
+def calculate_expectancy(trades: List[Dict], initial_balance: float) -> Dict:
     """Expectancy analysis.
 
     Returns:
@@ -226,7 +234,8 @@ def calculate_time_in_market(trades: List[Dict],
     return total_holding / len(trades)
 
 
-def summarize_trades(trades: List[Dict], initial_balance: float = 10000.0,
+def summarize_trades(trades: List[Dict], initial_balance: float,
+                     risk_free_rate: float, periods_per_year: int,
                      total_period_hours: Optional[float] = None) -> Dict:
     """Return a comprehensive metrics dictionary from a list of trade dicts."""
     if not trades:
@@ -248,13 +257,8 @@ def summarize_trades(trades: List[Dict], initial_balance: float = 10000.0,
                                           if not equity_df.empty else [])
     returns = [t.get('profit', 0) / initial_balance for t in trades
                if t.get('profit') is not None]
-    sharpe = calculate_sharpe_ratio(returns)
-    sortino = calculate_sortino_ratio(returns)
-    calmar = calculate_calmar_ratio(
-        total_profit / initial_balance * 100 if trades else 0,
-        max_dd,
-    )
-
+    sharpe = calculate_sharpe_ratio(returns, risk_free_rate, periods_per_year)
+    sortino = calculate_sortino_ratio(returns, risk_free_rate, periods_per_year)
     # Estimate period from trade times
     if total_period_hours is None and trades:
         times = [t.get('exit_time') or t.get('entry_time') for t in trades if t.get('entry_time')]
@@ -265,6 +269,11 @@ def summarize_trades(trades: List[Dict], initial_balance: float = 10000.0,
             total_period_hours = 24
 
     years = total_period_hours / (365.25 * 24) if total_period_hours else 1.0
+    calmar = calculate_calmar_ratio(
+        total_profit / initial_balance * 100 if trades else 0,
+        max_dd,
+        years,
+    )
     final_balance = initial_balance + total_profit
     cagr = calculate_cagr(initial_balance, final_balance, max(years, 0.01))
     sqn = calculate_sqn(returns)

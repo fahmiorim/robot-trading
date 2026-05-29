@@ -96,13 +96,6 @@ class IExchange(ABC):
         """Block until a new candle opens."""
         ...
 
-    @abstractmethod
-    def modify_position(self, position_id: str, sl: Optional[float] = None,
-                        tp: Optional[float] = None,
-                        symbol: Optional[str] = None) -> bool:
-        """Modify SL/TP on an open position."""
-        ...
-
     def create_stop_loss_limit_order(self, symbol: str, side: str, volume: float,
                                       stop_price: float, limit_price: float,
                                       **kwargs) -> Dict[str, Any]:

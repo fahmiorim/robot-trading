@@ -6,15 +6,7 @@ import streamlit as st
 
 
 def render_trade_metrics(df: pd.DataFrame, profit_col: str = "profit"):
-    """Render compact HTML metrics bar (Trades, P&L, Win Rate, Avg Trade) + P&L bar chart.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Trade dataframe. Must contain profit_col.
-    profit_col : str
-        Column name for profit values.
-    """
+    """Render compact glass-card metrics bar + P&L bar chart."""
     n_trades = len(df)
     total = 0.0
     win_rate = 0.0
@@ -32,40 +24,23 @@ def render_trade_metrics(df: pd.DataFrame, profit_col: str = "profit"):
     pnl_sign = "+" if total >= 0 else ""
     avg_sign = "+" if avg_trade >= 0 else ""
 
-    html = f"""
-    <div style="font-family: 'Outfit', sans-serif; display: flex; justify-content: space-between;
-         align-items: center; background: rgba(255,255,255,0.02); padding: 10px 16px;
-         border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin: 10px 0;">
-        <div style="flex: 1; text-align: center;">
-            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700;
-                 text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">TRADES</div>
-            <div style="font-size: 0.9rem; font-weight: 800; color: #ffffff;">{n_trades}</div>
-        </div>
-        <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.08);"></div>
-        <div style="flex: 1; text-align: center;">
-            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700;
-                 text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">TOTAL P&L</div>
-            <div style="font-size: 0.9rem; font-weight: 800; color: {pnl_color};">
-                {pnl_sign}${total:.2f}
-            </div>
-        </div>
-        <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.08);"></div>
-        <div style="flex: 1; text-align: center;">
-            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700;
-                 text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">WIN RATE</div>
-            <div style="font-size: 0.9rem; font-weight: 800; color: #a5b4fc;">{win_rate:.1f}%</div>
-        </div>
-        <div style="width: 1px; height: 22px; background: rgba(255,255,255,0.08);"></div>
-        <div style="flex: 1; text-align: center;">
-            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700;
-                 text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">AVG TRADE</div>
-            <div style="font-size: 0.9rem; font-weight: 800; color: {avg_color};">
-                {avg_sign}${avg_trade:.2f}
-            </div>
-        </div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
+    sep = '<div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>'
+    cells = sep.join(f'''
+        <div style="flex:1; text-align:center;">
+            <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase;
+                 letter-spacing:0.05em; margin-bottom:2px;">{lbl}</div>
+            <div style="font-size:0.9rem; font-weight:800; color:{clr};">{val}</div>
+        </div>''' for lbl, val, clr in [
+        ("Trades", str(n_trades), "#ffffff"),
+        ("Total P&L", f"{pnl_sign}${total:.2f}", pnl_color),
+        ("Win Rate", f"{win_rate:.1f}%", "#a5b4fc"),
+        ("Avg Trade", f"{avg_sign}${avg_trade:.2f}", avg_color),
+    ])
+    st.markdown(
+        f'<div class="glass-card" style="padding:0.6rem 1rem; margin-bottom:0.5rem;">'
+        f'<div style="display:flex; align-items:center;">{cells}</div></div>',
+        unsafe_allow_html=True,
+    )
 
     if profit_col in df.columns:
         # P&L bar chart — transparent background, premium style

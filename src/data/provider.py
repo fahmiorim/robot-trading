@@ -34,8 +34,8 @@ class DataProvider:
         3. MT5 exchange (source of truth)
     """
 
-    def __init__(self, exchange: IExchange, symbol: str = "XAUUSD",
-                 timeframe: str = "TIMEFRAME_M15", default_count: int = 2000,
+    def __init__(self, exchange: IExchange, symbol: str,
+                 timeframe: str, default_count: int,
                  db: Optional[Any] = None):
         self.exchange = exchange
         self.symbol = symbol

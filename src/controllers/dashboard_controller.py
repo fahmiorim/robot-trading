@@ -50,13 +50,13 @@ class DashboardController:
         status.update({
             "symbol": self.config.get("general", "symbol"),
             "timeframe": self.config.get("general", "timeframe"),
-            "trading_mode": self.config.get("trading", "mode") or "live",
-            "paper_trading": (self.config.get("trading", "mode") or "live") in ("paper", "dry-run"),
+            "trading_mode": self.config.get("trading", "mode"),
+            "paper_trading": self.config.get("trading", "mode") in ("paper", "dry-run"),
         })
         return status
 
     def get_config_value(self, section: str, key: str, default=None):
-        return self.config.get(section, key, default=default)
+        return self.config.get(section, key)
 
     # ── Trade History ──
 
@@ -82,6 +82,14 @@ class DashboardController:
     def get_all_hyperopt_results(self) -> List[HyperoptResult]:
         return self.analytics_repo.find_all_hyperopt_results()
 
+    def get_ml_training_log(self, limit: int = 20) -> List[Dict]:
+        """Get recent ML training runs from ml_training_log table."""
+        return self.analytics_repo.get_ml_training_log(limit=limit)
+
+    def check_concept_drift(self, threshold_pct: float = 5.0) -> Dict:
+        """Check if latest training accuracy dropped >threshold_pct vs avg of previous 3 runs."""
+        return self.analytics_repo.check_concept_drift(threshold_pct=threshold_pct)
+
     # ── Settings ──
 
     def get_all_settings(self) -> BotConfig:
@@ -97,5 +105,6 @@ class DashboardController:
         try:
             db = get_db()
             return db.is_connected() if hasattr(db, 'is_connected') else True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Database connection check failed: {e}")
             return False

@@ -1,6 +1,7 @@
-﻿"""Reusable component: Auto Trading start / stop controls."""
+"""Reusable component: Auto Trading start / stop controls."""
 
 import time
+import textwrap
 
 import streamlit as st
 
@@ -29,7 +30,7 @@ def _render_compact(config):
     """Compact sidebar version — minimal status + start/stop."""
     if st.session_state.auto_trading_enabled:
         cycles = st.session_state.robot.cycle_count
-        st.markdown(f"""
+        st.markdown(textwrap.dedent(f"""
         <div style="font-family: 'Outfit', sans-serif; background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(15, 15, 26, 0.2)); backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 14px; padding: 0.8rem 1.1rem; margin-bottom: 0.8rem; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.08);">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="live-dot red"></span>
@@ -40,7 +41,7 @@ def _render_compact(config):
                 <span>⚡ Running</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
         if st.button("⏹ STOP Auto Trading", width='stretch', type="primary"):
             st.session_state.worker.stop()
             config.set("general", "auto_trade", False)
@@ -50,7 +51,7 @@ def _render_compact(config):
             st.session_state.last_auto_cycle_time = time.time()
             st.rerun()
     else:
-        st.markdown("""
+        st.markdown(textwrap.dedent("""
         <div style="font-family: 'Outfit', sans-serif; background: rgba(255, 255, 255, 0.01); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 14px; padding: 0.8rem 1.1rem; margin-bottom: 0.8rem; opacity: 0.7;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="live-dot" style="background: rgba(255,255,255,0.15); box-shadow: none; animation: none;"></span>
@@ -58,7 +59,7 @@ def _render_compact(config):
             </div>
             <div style="font-size: 0.7rem; opacity: 0.45; margin-top: 6px; font-weight: 500;">Use Trading page to start</div>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
         auto_trade = config.get("general", "auto_trade")
         auto_trade_new = st.toggle("Enable Auto Trade", value=auto_trade)
         if auto_trade_new != auto_trade:

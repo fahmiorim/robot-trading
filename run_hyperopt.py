@@ -19,7 +19,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 from src.configuration.manager import ConfigManager
 from src.backtesting.engine import Backtester
 from src.backtesting.hyperopt import Hyperopt
-import src.strategy
 from src.strategy.interface import IStrategy
 
 

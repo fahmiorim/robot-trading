@@ -1,11 +1,12 @@
-﻿"""Charts & Market Analysis page — price chart, market analysis, signals."""
+"""Charts & Market Analysis page — price chart, market analysis, signals."""
 
 import time
+import textwrap
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
-from dashboard.helpers import ensure_mt5, refresh_robot, map_sig
+from dashboard.helpers import ensure_mt5, refresh_robot, map_sig, get_available_symbols
 
 from src.configuration import TIMEFRAME_MAP
 from src.rpc.websocket import set_shared
@@ -38,7 +39,13 @@ def render():
     with st.container(border=True):
         cc = st.columns([2, 2, 2, 1.5], vertical_alignment="bottom")
         with cc[0]:
-            symbol = st.text_input("Symbol", value=config.get("general", "symbol"), key="chart_symbol")
+            avail_sym = get_available_symbols()
+            current_sym = config.get("general", "symbol")
+            if avail_sym:
+                sym_idx = avail_sym.index(current_sym) if current_sym in avail_sym else 0
+                symbol = st.selectbox("Symbol", avail_sym, index=sym_idx, key="chart_symbol")
+            else:
+                symbol = st.text_input("Symbol", value=current_sym, key="chart_symbol")
             if symbol != config.get("general", "symbol"):
                 config.set("general", "symbol", symbol)
                 config.save()
@@ -206,7 +213,7 @@ def render():
                 c_bg = colors_bg.get(regime_lower, "rgba(255, 255, 255, 0.02)")
                 c_border = colors_border.get(regime_lower, "rgba(255, 255, 255, 0.05)")
                 
-                st.markdown(f"""
+                st.markdown(textwrap.dedent(f"""
                 <div style="font-family: 'Outfit', sans-serif; background: {c_bg}; border: 1px solid {c_border}; border-radius: 12px; padding: 1.1rem; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                     <div style="font-size: 2.2rem;">🔍</div>
                     <div>
@@ -215,7 +222,7 @@ def render():
                         <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 4px; line-height: 1.4;">Detects trending, ranging or choppy market conditions.</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
                 
             with cb:
                 with st.spinner("Running backtest..."):
@@ -224,7 +231,7 @@ def render():
                 name = robot.best_strategy.name if robot.best_strategy else "N/A"
                 set_shared("best_strategy", name)
                 
-                st.markdown(f"""
+                st.markdown(textwrap.dedent(f"""
                 <div style="font-family: 'Outfit', sans-serif; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 12px; padding: 1.1rem; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.05);">
                     <div style="font-size: 2.2rem; filter: drop-shadow(0 0 10px rgba(99,102,241,0.25));">🏆</div>
                     <div>
@@ -233,6 +240,6 @@ def render():
                         <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 4px; color: #c7d2fe; line-height: 1.4;">Optimized best performer based on walk-forward backtest.</div>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
         else:
             st.info("Fetch data to see market analysis")

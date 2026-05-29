@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class RiskState:
     """Current risk state of the trading bot."""
-    symbol: str = "XAUUSD"
+    symbol: str = ""
     initial_balance: Optional[float] = None
     current_balance: Optional[float] = None
     peak_balance: Optional[float] = None

@@ -1,8 +1,23 @@
-"""Analytics database operations — performance, equity, circuit breaker, hyperopt from MySQL."""
-
 import json
+import numpy as np
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
+
+
+def _clean_numpy_types(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _clean_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_clean_numpy_types(x) for x in obj]
+    elif isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return [_clean_numpy_types(x) for x in obj.tolist()]
+    return obj
 
 from src.utils.logging import get_logger
 
@@ -95,15 +110,16 @@ class AnalyticsMixin:
 
     def log_circuit_breaker(self, reason: str, drawdown_pct: Optional[float] = None,
                             balance_before: Optional[float] = None,
-                            balance_after: Optional[float] = None) -> Optional[int]:
+                            balance_after: Optional[float] = None,
+                            cooldown_minutes: int = 120) -> Optional[int]:
         try:
             conn = self.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO circuit_breaker_log
-                    (triggered_at, reason, drawdown_pct, balance_before, balance_after)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (datetime.now(), reason, drawdown_pct, balance_before, balance_after))
+                    (triggered_at, reason, drawdown_pct, balance_before, balance_after, auto_reset_at)
+                VALUES (%s, %s, %s, %s, %s, NOW() + INTERVAL %s MINUTE)
+            """, (datetime.now(), reason, drawdown_pct, balance_before, balance_after, cooldown_minutes))
             conn.commit()
             cb_id = cursor.lastrowid
             cursor.close()
@@ -116,9 +132,14 @@ class AnalyticsMixin:
         try:
             conn = self.connect()
             cursor = conn.cursor(dictionary=True)
+            # Use COALESCE for auto_reset_at, if it exists and is in the future, it's active.
+            # Otherwise, check the cooldown from triggered_at.
             cursor.execute("""
                 SELECT * FROM circuit_breaker_log
-                WHERE status='active' AND triggered_at >= NOW() - INTERVAL %s MINUTE
+                WHERE status='active' AND (
+                    (auto_reset_at IS NOT NULL AND auto_reset_at > NOW()) OR
+                    (auto_reset_at IS NULL AND triggered_at >= NOW() - INTERVAL %s MINUTE)
+                )
                 ORDER BY triggered_at DESC LIMIT 1
             """, (cooldown_minutes,))
             row = cursor.fetchone()
@@ -136,6 +157,10 @@ class AnalyticsMixin:
         try:
             conn = self.connect()
             cursor = conn.cursor()
+            clean_params = _clean_numpy_types(params)
+            clean_metrics = {k: v for k, v in metrics.items()
+                             if k not in ('equity_curve', 'trades')}
+            clean_metrics = _clean_numpy_types(clean_metrics)
             cursor.execute("""
                 INSERT INTO hyperopt_results
                     (strategy_name, best_params, best_score, metrics,
@@ -146,9 +171,8 @@ class AnalyticsMixin:
                     metrics=VALUES(metrics), n_trials=VALUES(n_trials),
                     elapsed_seconds=VALUES(elapsed_seconds), updated_at=NOW()
             """, (
-                strategy_name, json.dumps(params), float(score),
-                json.dumps({k: v for k, v in metrics.items()
-                           if k not in ('equity_curve', 'trades')}),
+                strategy_name, json.dumps(clean_params), float(score),
+                json.dumps(clean_metrics),
                 int(n_trials), float(elapsed),
             ))
             conn.commit()
@@ -199,6 +223,73 @@ class AnalyticsMixin:
             return result
         except Exception as e:
             logger.error(f"Get all hyperopt results failed: {e}")
+            return []
+
+    # ── ML Training Log ─────────────────────────────────────
+
+    def save_ml_training_log(self, log_data: Dict[str, Any]) -> bool:
+        """Save an ML training run record to ml_training_log."""
+        try:
+            conn = self.connect()
+            cursor = conn.cursor()
+            params_json = json.dumps(_clean_numpy_types(log_data.get('params_used', {})))
+            class_dist_json = json.dumps(_clean_numpy_types(log_data.get('class_distribution', {})))
+            fi_json = json.dumps(_clean_numpy_types(log_data.get('feature_importance', [])))
+
+            cursor.execute("""
+                INSERT INTO ml_training_log
+                    (trained_at, model_type, accuracy, params_used,
+                     class_distribution, feature_importance, n_samples,
+                     data_range_start, data_range_end,
+                     atr_multiplier, threshold, data_source, symbol, timeframe)
+                VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                log_data.get('model_type'),
+                log_data.get('accuracy'),
+                params_json,
+                class_dist_json,
+                fi_json,
+                log_data.get('n_samples'),
+                log_data.get('data_range_start'),
+                log_data.get('data_range_end'),
+                log_data.get('atr_multiplier'),
+                log_data.get('threshold'),
+                log_data.get('data_source', 'mt5'),
+                log_data.get('symbol'),
+                log_data.get('timeframe'),
+            ))
+            conn.commit()
+            cursor.close()
+            logger.info(f"ML training log saved: {log_data.get('model_type')} acc={log_data.get('accuracy')}")
+            return True
+        except Exception as e:
+            logger.error(f"Save ML training log failed: {e}")
+            return False
+
+    def get_ml_training_log(self, limit: int = 20) -> List[Dict]:
+        """Get recent ML training runs, newest first."""
+        try:
+            conn = self.connect()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT * FROM ml_training_log
+                ORDER BY trained_at DESC LIMIT %s
+            """, (limit,))
+            rows = cursor.fetchall()
+            cursor.close()
+            result = []
+            for row in rows:
+                entry = dict(row)
+                for json_field in ('params_used', 'class_distribution', 'feature_importance'):
+                    if isinstance(entry.get(json_field), str):
+                        try:
+                            entry[json_field] = json.loads(entry[json_field])
+                        except Exception:
+                            pass
+                result.append(self._rows_to_dicts([entry])[0])
+            return result
+        except Exception as e:
+            logger.error(f"Get ML training log failed: {e}")
             return []
 
     # ── Health Check Log ────────────────────────────────────

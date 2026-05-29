@@ -7,9 +7,9 @@ echo ========================================
 echo.
 echo Memulai Streamlit dashboard...
 echo.
-cd /d "D:\laragon\www\robot"
+cd /d "D:\laragon\www\robot-trading"
 
-rem Streamlit akan otomatis buka browser
-python -m streamlit run dashboard.py
+rem Jalankan Streamlit langsung — lebih stabil dari python -m dashboard
+python -m streamlit run dashboard.py --server.port=8501
 
 pause

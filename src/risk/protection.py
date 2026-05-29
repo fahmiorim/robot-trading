@@ -44,7 +44,7 @@ class ProtectionContext:
 class CooldownProtection(IProtection):
     """Prevents trading too soon after the last trade."""
 
-    def __init__(self, minutes: int = 1):
+    def __init__(self, minutes: int):
         self._minutes = minutes
 
     def name(self) -> str:
@@ -61,7 +61,7 @@ class CooldownProtection(IProtection):
 class StoplossGuard(IProtection):
     """Limits stop-loss hits within a time window."""
 
-    def __init__(self, max_stoploss: int = 3, window_hours: int = 4):
+    def __init__(self, max_stoploss: int, window_hours: int):
         self._max = max_stoploss
         self._window = window_hours * 3600
 
@@ -69,10 +69,18 @@ class StoplossGuard(IProtection):
         return f"StoplossGuard ({self._max}/{self._window // 3600}h)"
 
     def check(self, ctx: ProtectionContext) -> Tuple[bool, str]:
-        elapsed = time.time() - ctx.stoploss_window_start
-        if elapsed > self._window:
+        if ctx.stoploss_hits == 0:
             return False, ""
+
+        now = time.time()
+        # If the window has expired, reset the hits and the window start
+        if ctx.stoploss_window_start > 0 and (now - ctx.stoploss_window_start) > self._window:
+            ctx.stoploss_hits = 0
+            ctx.stoploss_window_start = 0
+            return False, ""
+
         if ctx.stoploss_hits >= self._max:
+            elapsed = now - ctx.stoploss_window_start if ctx.stoploss_window_start > 0 else 0
             return True, f"Stoploss hit {ctx.stoploss_hits}x in {elapsed / 3600:.1f}h"
         return False, ""
 
@@ -80,7 +88,7 @@ class StoplossGuard(IProtection):
 class MaxDrawdownProtection(IProtection):
     """Stops trading when drawdown exceeds the configured limit."""
 
-    def __init__(self, max_drawdown_pct: float = 15.0):
+    def __init__(self, max_drawdown_pct: float):
         self._max_dd = max_drawdown_pct
 
     def name(self) -> str:
@@ -95,11 +103,12 @@ class MaxDrawdownProtection(IProtection):
 class ProtectionManager:
     """Manages all protection rules and evaluates them together."""
 
-    def __init__(self):
+    def __init__(self, config):
         self._protections: List[IProtection] = [
-            CooldownProtection(minutes=1),
-            StoplossGuard(max_stoploss=3, window_hours=4),
-            MaxDrawdownProtection(max_drawdown_pct=15.0),
+            CooldownProtection(minutes=config.get("risk_management", "cooldown_minutes")),
+            StoplossGuard(max_stoploss=config.get("protection", "max_stoploss"),
+                          window_hours=config.get("protection", "stoploss_window_hours")),
+            MaxDrawdownProtection(max_drawdown_pct=config.get("risk_management", "max_drawdown_pct")),
         ]
 
     def add(self, protection: IProtection) -> None:

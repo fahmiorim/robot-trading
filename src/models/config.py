@@ -6,82 +6,66 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class ExchangeConfig:
-    type: str = "mt5"
-    name: str = "MetaTrader"
-    api_key: str = ""
-    secret: str = ""
-    password: str = ""
-    sandbox: bool = False
-    options: Optional[Dict] = None
+    type: str
+    name: str
+    api_key: str
+    secret: str
+    password: str
+    sandbox: bool
+    options: Optional[Dict]
 
 
 @dataclass
 class GeneralConfig:
-    symbol: str = "XAUUSD"
-    timeframe: str = "TIMEFRAME_M15"
-    magic_number: int = 123456
-    cycle_interval_minutes: int = 15
-    auto_trade: bool = False
+    symbol: str
+    timeframe: str
+    magic_number: int
+    cycle_interval_minutes: int
+    auto_trade: bool
 
 
 @dataclass
 class RiskConfig:
-    position_size_pct: float = 1.0
-    max_drawdown_pct: float = 20.0
-    max_daily_loss_pct: float = 5.0
-    stop_loss_pct: float = 1.0
-    take_profit_pct: float = 2.0
-    max_open_positions: int = 5
-    use_trailing_stop: bool = False
-    trailing_stop_activation_pct: float = 0.5
-    trailing_stop_distance_pct: float = 0.3
+    position_size_pct: float
+    max_drawdown_pct: float
+    max_daily_loss_pct: float
+    stop_loss_pct: float
+    take_profit_pct: float
+    max_open_positions: int
+    use_trailing_stop: bool
+    trailing_stop_activation_pct: float
+    trailing_stop_distance_pct: float
 
 
 @dataclass
 class TradingConfig:
-    mode: str = "paper"       # paper / live / dry-run
-    strategy_pre_validation: bool = False
-    min_backtest_trades: int = 5
-    min_win_rate: float = 50.0
-    max_backtest_drawdown: float = 30.0
+    mode: str
+    strategy_pre_validation: bool
+    min_backtest_trades: int
+    min_win_rate: float
+    max_backtest_drawdown: float
 
 
 @dataclass
 class MLConfig:
-    model_type: str = "random_forest"
-    retrain_interval_hours: int = 24
+    model_type: str
+    retrain_interval_hours: int
 
 
 @dataclass
 class BacktestConfig:
-    initial_balance: float = 10000.0
-    commission_pct: float = 0.1
-    slippage_pct: float = 0.05
+    initial_balance: float
+    commission_pct: float
+    slippage_pct: float
 
 
 @dataclass
 class BotConfig:
-    """Complete typed bot configuration."""
-    general: GeneralConfig = None
-    exchange: ExchangeConfig = None
-    risk: RiskConfig = None
-    trading: TradingConfig = None
-    ml: MLConfig = None
-    backtest: BacktestConfig = None
-    raw: Dict[str, Any] = None
-
-    def __post_init__(self):
-        if self.general is None:
-            self.general = GeneralConfig()
-        if self.exchange is None:
-            self.exchange = ExchangeConfig()
-        if self.risk is None:
-            self.risk = RiskConfig()
-        if self.trading is None:
-            self.trading = TradingConfig()
-        if self.ml is None:
-            self.ml = MLConfig()
-        if self.backtest is None:
-            self.backtest = BacktestConfig()
-        if self.raw is None:
-            self.raw = {}
+    """Complete typed bot configuration — all fields must be provided from DB."""
+    general: GeneralConfig
+    exchange: ExchangeConfig
+    risk: RiskConfig
+    trading: TradingConfig
+    ml: MLConfig
+    backtest: BacktestConfig
+    raw: Dict[str, Any]

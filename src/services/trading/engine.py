@@ -15,7 +15,6 @@ Usage::
 from typing import Any, Dict, Optional
 
 from src.controllers.trading_controller import TradingController
-from src.services.trading.signal_aggregator import SignalAggregator
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,7 +32,8 @@ class TradingBot(TradingController):
         super().__init__(config=config, bypass_lock=bypass_lock)
 
         # Backward-compat: some callers reference signal_aggregator directly
-        self.signal_aggregator = SignalAggregator()
+        # Alias to the real signal_service so both APIs stay in sync
+        self.signal_aggregator = self.signal_service
 
         # Extra state that only the original TradingBot tracked
         self._dca_tracker: Dict[str, int] = {}
@@ -46,8 +46,6 @@ class TradingBot(TradingController):
 
     def run_trading_cycle(self, force_refresh: bool = False) -> Dict:
         """Alias for ``run_cycle()`` — kept for backward compatibility.
-
-        Called by ``main.run_auto_cycle()`` and ``cli.py``.
         """
         return self.run_cycle(force_refresh=force_refresh)
 
@@ -57,7 +55,6 @@ class TradingBot(TradingController):
             data, use_ml=use_ml, use_agent=use_agent, use_swarm=use_swarm,
         )
         self._last_signals = self.signal_service.get_last_signals()
-        self.signal_aggregator._last_signals = dict(self._last_signals)
         return sig
 
     def _get_roi_price(self, entry_price: float, side: str,

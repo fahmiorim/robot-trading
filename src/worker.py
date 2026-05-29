@@ -53,10 +53,12 @@ class Worker:
         logger.info("Worker started")
 
     def stop(self) -> None:
-        """Signal the worker to stop."""
+        """Signal the worker to stop and wait for thread to finish."""
         self._stop_event.set()
         self._running = False
-        logger.info("Worker stopping...")
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5.0)
+        logger.info("Worker stopped")
 
     def wait(self, timeout: Optional[float] = None) -> None:
         """Wait for the worker thread to finish."""
@@ -72,6 +74,7 @@ class Worker:
         logger.info("Worker loop started")
 
         while not self._stop_event.is_set():
+            cycle_start = time.time()
             try:
                 # Check if auto_trade is enabled
                 auto = self.bot.config.get("general", "auto_trade")
@@ -79,6 +82,9 @@ class Worker:
                     logger.debug("Auto-trade enabled, running cycle...")
                     result = self.bot.run_cycle()
                     self._cycle_results.append(result)
+                    # Keep only last 100 results to prevent memory leak
+                    if len(self._cycle_results) > 100:
+                        self._cycle_results.pop(0)
                     # Log trade alerts
                     if result.get("success") and result.get("action") not in ("HOLD", None):
                         self.bot.rpc.send_trade_alert(
@@ -102,12 +108,12 @@ class Worker:
             except Exception as e:
                 logger.error(f"Worker cycle error: {e}")
 
-            # Sleep for cycle interval
+            # Sleep for cycle interval (accounting for cycle duration)
             interval = self.bot.config.get("general", "cycle_interval_minutes")
-            for _ in range(int(interval * 60)):
+            elapsed = time.time() - cycle_start
+            wait_time = max(1, (interval * 60) - elapsed)
+            
+            for _ in range(int(wait_time)):
                 if self._stop_event.is_set():
                     break
                 time.sleep(1)
-
-
-

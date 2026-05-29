@@ -19,17 +19,21 @@ class ROIManager:
     ) -> Optional[float]:
         """Calculate the ROI target price for a position based on elapsed time."""
         roi_cfg = self.config.get("roi")
-        if not isinstance(roi_cfg, dict) or not roi_cfg.get("enabled", True):
-            return None
-        if not roi_cfg.get("use_roi_table", True):
+        if not isinstance(roi_cfg, dict) or not roi_cfg.get("enabled"):
             return None
 
-        table = roi_cfg.get("table", [])
+        table = roi_cfg["table"]
         if not table:
             return None
 
+        # Ensure table is sorted by minutes ascending
+        try:
+            sorted_table = sorted(table, key=lambda x: x.get("minutes", 0))
+        except Exception:
+            sorted_table = table
+
         roi_pct = 0.0
-        for tier in table:
+        for tier in sorted_table:
             if tier.get("minutes", 0) <= position_time_minutes:
                 roi_pct = tier.get("roi_pct", 0)
             else:
@@ -44,15 +48,16 @@ class ROIManager:
             return entry_price * (1 - roi_pct / 100.0)
 
     def check_take_profit(
-        self, exchange: Any, symbol: str, paper_trading: bool = False, close_position_fn=None
+        self, exchange: Any, symbol: str, paper_trading: bool, close_position_fn,
+        positions_override: list = None
     ) -> None:
         """Check open positions and close any that hit ROI target."""
-        if paper_trading:
+        try:
+            positions = positions_override if positions_override is not None else exchange.get_open_positions(symbol)
+        except Exception:
             return
 
-        try:
-            positions = exchange.get_open_positions(symbol)
-        except Exception:
+        if not positions:
             return
 
         for pos in positions:
@@ -72,7 +77,8 @@ class ROIManager:
                     except Exception:
                         position_time = None
                 if isinstance(position_time, datetime):
-                    elapsed_min = (datetime.now() - position_time).total_seconds() / 60
+                    now = datetime.now(position_time.tzinfo) if position_time.tzinfo else datetime.now()
+                    elapsed_min = (now - position_time).total_seconds() / 60
 
             roi_price = self.get_roi_price(entry, side, elapsed_min)
             if roi_price is None:

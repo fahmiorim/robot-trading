@@ -59,10 +59,24 @@ class SignalAggregator:
         """Swarm intelligence — votes from ML model + all strategies."""
         try:
             from src.ml.model import MLModel
+            import os
 
-            model = MLModel()
+            if not hasattr(self, "_swarm_model"):
+                self._swarm_model = MLModel()
+                self._swarm_model.load("trained_models/latest_model.pkl")
+                
+            model = self._swarm_model
+            model_path = "trained_models/latest_model.pkl"
+            
+            # Reload from disk if the file has changed
+            if os.path.exists(model_path):
+                mtime = os.path.getmtime(model_path)
+                if not hasattr(self, "_swarm_model_mtime") or self._swarm_model_mtime != mtime:
+                    model.load(model_path)
+                    self._swarm_model_mtime = mtime
+
             ml_sig = 0
-            if model.load("trained_models/latest_model.pkl"):
+            if model.is_trained:
                 pred = model.predict(data)
                 ml_sig = int(pred.item()) if hasattr(pred, "item") else int(pred[0])
 

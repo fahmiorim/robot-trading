@@ -12,6 +12,21 @@ logger = get_logger(__name__)
 class TradingMixin:
     """Mixin providing trade history and signal log operations for DatabaseManager."""
 
+    def get_trade_by_ticket(self, ticket: int) -> Optional[Dict]:
+        try:
+            conn = self.connect()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM trade_history WHERE ticket=%s", (ticket,))
+            row = cursor.fetchone()
+            cursor.close()
+            if row:
+                # Convert Decimals to float
+                return {k: float(v) if hasattr(v, 'scale') else v for k, v in row.items()}
+            return None
+        except Exception as e:
+            logger.error(f"Get trade by ticket failed: {e}")
+            return None
+
     # ── Trade History ────────────────────────────────────────
 
     def log_trade(self, trade: Dict[str, Any]) -> Optional[int]:
@@ -24,13 +39,13 @@ class TradingMixin:
                      retcode, comment, strategy, signal_val, status, entry_time, paper_trade)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
-                trade.get('ticket'), trade.get('symbol', 'XAUUSD'),
-                trade.get('action', 'BUY'), trade.get('volume', 0),
-                trade.get('price', 0), trade.get('sl'), trade.get('tp'),
-                trade.get('profit'), trade.get('retcode'), trade.get('comment', ''),
-                trade.get('strategy'), trade.get('signal_val', 0),
-                trade.get('status', 'open'), trade.get('entry_time', datetime.now()),
-                trade.get('paper_trade', 0),
+                trade.get('ticket'), trade['symbol'],
+                trade['action'], trade['volume'],
+                trade['price'], trade.get('sl'), trade.get('tp'),
+                trade.get('profit'), trade.get('retcode'), trade['comment'],
+                trade.get('strategy'), trade['signal_val'],
+                trade['status'], trade['entry_time'],
+                trade['paper_trade'],
             ))
             conn.commit()
             trade_id = cursor.lastrowid
@@ -123,13 +138,13 @@ class TradingMixin:
                 INSERT INTO signal_log (symbol, timestamp, source, signal_val, regime, price, details)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
-                signal_data.get('symbol', 'XAUUSD'),
-                signal_data.get('timestamp', datetime.now()),
-                signal_data.get('source', 'unknown'),
-                signal_data.get('signal_val', 0),
+                signal_data['symbol'],
+                signal_data['timestamp'],
+                signal_data['source'],
+                signal_data['signal_val'],
                 signal_data.get('regime'),
                 signal_data.get('price'),
-                json.dumps(signal_data.get('details', {})),
+                json.dumps(signal_data.get('details')),
             ))
             conn.commit()
             sig_id = cursor.lastrowid

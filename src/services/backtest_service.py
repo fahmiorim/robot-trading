@@ -43,8 +43,8 @@ class BacktestService:
     def run_walk_forward(self, data: pd.DataFrame,
                           signal_generator,
                           strategy_name: str,
-                          train_frac: float = 0.7,
-                          n_windows: int = 3) -> Dict[str, Any]:
+                           train_frac: float,
+                           n_windows: int) -> Dict[str, Any]:
         """Run walk-forward validation."""
         return self.engine.run_walk_forward(
             data, signal_generator, strategy_name,
@@ -62,8 +62,8 @@ class BacktestService:
         return self.engine.compare_strategies()
 
     def run_hyperopt(self, strategy_cls: type, data: pd.DataFrame,
-                     loss: str = "sharpe",
-                     n_calls: int = 30) -> Any:
+                     loss: str,
+                     n_calls: int) -> Any:
         """Run Bayesian hyperparameter optimization."""
         return self.hyperopt.optimize(
             strategy_cls, data, loss=loss, n_calls=n_calls,

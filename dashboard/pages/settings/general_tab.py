@@ -1,4 +1,5 @@
 import streamlit as st
+import textwrap
 
 from dashboard.helpers import get_available_symbols
 from src.configuration import TIMEFRAME_MAP
@@ -46,7 +47,7 @@ def render(config) -> bool:
         }.get(_cfg_trade_mode, 'Unknown trade mode')
         _cfg_tm_vol = f"min={_cfg_trade_info['volume_min']}, step={_cfg_trade_info['volume_step']}" if _cfg_trade_info else "\u2014"
 
-        st.markdown(f"""
+        st.markdown(textwrap.dedent(f"""
         <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 0.5rem 0.8rem; margin-top: 0.5rem; font-size: 0.8rem;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                 <span style="font-size: 1rem;">{_cfg_tm_icon}</span>
@@ -58,7 +59,7 @@ def render(config) -> bool:
                 <span>\U0001f522 Digits: {_cfg_trade_info.get('digits', '\u2014') if _cfg_trade_info else '\u2014'}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
 
     with col2:
         tf_options = list(TIMEFRAME_MAP.keys())

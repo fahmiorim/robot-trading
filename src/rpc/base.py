@@ -99,7 +99,7 @@ class RPCManager:
         if getattr(self.bot, "auto_trading", False):
             return "⚠️ Bot is already running."
         self.bot.auto_trading = True
-        setattr(self.bot, "_last_cycle_time", __import__("time").time())
+        self.bot.system_service.mark_cycle_start()
         from src.rpc.websocket import set_shared
         set_shared("auto_trading", True)
         return "✅ Bot started — trading cycle active."
@@ -113,7 +113,7 @@ class RPCManager:
         return "⏹ Bot stopped — no new trades."
 
     def _cmd_stopbuy(self) -> str:
-        self.bot._stop_buy = True
+        self.bot.stop_buy = True
         return "🛑 Stop-buy activated — will not open new long positions."
 
     def _cmd_status(self) -> str:

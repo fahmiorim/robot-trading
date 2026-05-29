@@ -17,7 +17,7 @@ def _get_logger():
 class LockManager:
     """Manages PID-based lock file to prevent duplicate bot instances."""
 
-    def __init__(self, lock_file: str = "trading_bot.pid"):
+    def __init__(self, lock_file: str):
         self.lock_file = lock_file
 
     def acquire(self, bypass: bool = False) -> None:

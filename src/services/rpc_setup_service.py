@@ -65,7 +65,7 @@ class RPCSetupService:
         self.rpc.register(telegram)
 
         # Optional command polling
-        cmd_cfg = self.config.get("telegram_cmd")
+        cmd_cfg = self.config.get("telegram_cmd", default={})
         if isinstance(cmd_cfg, dict) and cmd_cfg.get("enabled", False):
             allowed = cmd_cfg.get("allowed_chat_ids", [])
             if allowed:
@@ -75,7 +75,11 @@ class RPCSetupService:
 
     def _setup_websocket(self, bot: Any) -> None:
         """Initialise WebSocket RPC backend and data pusher."""
-        self.ws = WebSocketRPC()
+        ws_cfg = self.config.get("websocket", default={})
+        self.ws = WebSocketRPC(
+            host=ws_cfg.get("host", "0.0.0.0"),
+            port=int(ws_cfg.get("port", 8765)),
+        )
         self.ws.bot = bot
         start_data_pusher(self.ws, bot, self.config)
         self.ws.start()
@@ -84,20 +88,19 @@ class RPCSetupService:
 
     def _setup_rest_api(self, bot: Any) -> None:
         """Initialise REST API server (optional)."""
-        api_cfg = self.config.get("rest_api")
+        api_cfg = self.config.get("rest_api", default={})
         if not isinstance(api_cfg, dict) or not api_cfg.get("enabled", False):
             return
 
         self.rest_api = RestAPI(
             bot=bot,
             host=str(api_cfg.get("host", "0.0.0.0")),
-            port=int(api_cfg.get("port", 8080)),
+            port=int(api_cfg.get("port", 8766)),
             api_key=str(api_cfg.get("api_key", "")),
         )
         self.rest_api.start()
         logger.info(
-            f"REST API enabled on {api_cfg.get('host', '0.0.0.0')}:"
-            f"{api_cfg.get('port', 8080)}"
+            f"REST API enabled on {api_cfg.get('host', '0.0.0.0')}:{api_cfg.get('port', 8766)}"
         )
 
     def stop_all(self) -> None:

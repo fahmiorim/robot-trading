@@ -34,7 +34,7 @@ TIMEFRAME_MAP = TIMEFRAME_MAP
 class ConfigManager:
     """Centralised configuration manager — **DB only**, no file fallback.
 
-    All defaults come from the database seed (``SETTINGS_SEED``).
+    All defaults come from the database seed (``schema.sql``).
     Fails immediately if the database is not available.
     """
 
@@ -81,24 +81,28 @@ class ConfigManager:
 
     # ── Get / Set / Update ────────────────────────────────────
 
-    def get(self, *keys: str, default: Any = None) -> Any:
+    def get(self, *keys: str, **kwargs) -> Any:
         """Get nested config value by key path.
 
-        All values come from the DB seed — no hardcoded defaults.
+        All values come from the database only. Raises ``KeyError``
+        if the key does not exist — unless ``default`` is provided.
 
         Example::
             config.get("risk_management", "position_size_pct")
+            config.get("websocket", default={})  # safe fallback
         """
-        if keys and not isinstance(keys[-1], str):
-            *keys, default = keys
+        default = kwargs.pop("default", None)
         val: Any = self.config
         for k in keys:
-            if isinstance(val, dict):
-                val = val.get(k)
-                if val is None:
-                    return default
+            if isinstance(val, dict) and k in val:
+                val = val[k]
             else:
-                return default
+                if default is not None:
+                    return default
+                raise KeyError(
+                    f"Config key \"{' > '.join(keys)}\" not found in database. "
+                    f"Ensure the settings table is seeded."
+                )
         return val
 
     def set(self, *args: Any) -> bool:
@@ -125,8 +129,9 @@ class ConfigManager:
 
     def reset_to_defaults(self) -> None:
         """Reset all values to factory defaults by re-seeding from DB."""
-        self._db.seed_settings()
-        db_settings = self._db.get_all_settings()
+        self.repository.seed()
+        raw = self.repository.find_all()
+        db_settings = raw.raw
         if db_settings:
             self.config = deepcopy(db_settings)
             logger.info("Config reset to DB defaults")
@@ -141,7 +146,9 @@ class ConfigManager:
 
     def get_timeframe_mt5(self) -> int:
         tf = self.get("general", "timeframe")
-        return TIMEFRAME_MAP.get(tf, 15)
+        if tf not in TIMEFRAME_MAP:
+            raise ValueError(f"Unknown timeframe '{tf}'; valid: {list(TIMEFRAME_MAP)}")
+        return TIMEFRAME_MAP[tf]
 
     def get_strategy_params(self, name: str) -> Dict[str, Any]:
         return self.get("strategies", name) or {}
@@ -221,24 +228,34 @@ class ConfigManager:
         return errors
 
     def validate_and_fix(self) -> List[str]:
-        """Validate and auto-fix safe values."""
+        """Validate config — reports errors instead of auto-fixing missing/invalid values.
+
+        All config values must come from the database seed — no silent fallbacks.
+        """
         errors = self.validate()
-        fixes = []
 
         sl = self.get("risk_management", "stop_loss_pct")
         if sl is None or sl <= 0:
-            self.set("risk_management", "stop_loss_pct", 1.0)
-            fixes.append("Auto-fix: stop_loss_pct → 1.0")
+            errors.append(
+                "risk_management.stop_loss_pct: missing or invalid — "
+                "must be provided by DB seed data"
+            )
         tp = self.get("risk_management", "take_profit_pct")
         if tp is None or tp <= 0:
-            self.set("risk_management", "take_profit_pct", 2.0)
-            fixes.append("Auto-fix: take_profit_pct → 2.0")
+            errors.append(
+                "risk_management.take_profit_pct: missing or invalid — "
+                "must be provided by DB seed data"
+            )
         ps = self.get("risk_management", "position_size_pct")
         if ps is None or ps <= 0:
-            self.set("risk_management", "position_size_pct", 1.0)
-            fixes.append("Auto-fix: position_size_pct → 1.0")
+            errors.append(
+                "risk_management.position_size_pct: missing or invalid — "
+                "must be provided by DB seed data"
+            )
 
-        if fixes:
-            logger.info(f"Config auto-fixes: {fixes}")
-            self.save()
-        return errors + fixes
+        if errors:
+            for e in errors:
+                logger.warning(f"Config validation: {e}")
+        else:
+            logger.info("Config validation passed")
+        return errors

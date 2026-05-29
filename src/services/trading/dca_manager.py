@@ -13,63 +13,82 @@ class DCAManager:
 
     def __init__(self, config: Any):
         self.config = config
+        self._dca_counts: Dict[int, int] = {} # ticket -> count
+        self._dca_timestamps: Dict[int, float] = {} # ticket -> last_time
 
     def check_opportunity(
         self,
         paper_positions: List[Dict],
         get_current_price_fn,
-        paper_trading: bool = False,
-        paper_balance: float = 10000.0,
+        paper_trading: bool,
+        paper_balance: float,
     ) -> Optional[Dict]:
-        """Check if there's a DCA opportunity for any open paper position.
+        """Check if there's a DCA opportunity for any open position.
 
         Returns a DCA info dict or None.
         """
         dca_cfg = self.config.get("dca")
-        if not isinstance(dca_cfg, dict) or not dca_cfg.get("enabled", False):
+        if not isinstance(dca_cfg, dict) or not dca_cfg["enabled"]:
             return None
 
-        max_dca = int(dca_cfg.get("max_dca_orders", 3))
-        trigger_pct = float(dca_cfg.get("dca_trigger_pct", -1.0))
-        cooldown_min = float(dca_cfg.get("dca_cooldown_minutes", 5))
-        increment_factor = float(dca_cfg.get("dca_increment_factor", 1.5))
-        position_limit_pct = float(dca_cfg.get("dca_position_limit_pct", 20.0))
+        max_dca = int(dca_cfg["max_dca_orders"])
+        trigger_pct = float(dca_cfg["dca_trigger_pct"])
+        cooldown_min = float(dca_cfg["dca_cooldown_minutes"])
+        increment_factor = float(dca_cfg["dca_increment_factor"])
+        position_limit_pct = float(dca_cfg["dca_position_limit_pct"])
 
         for pos in paper_positions:
-            price = get_current_price_fn()
-            is_buy = pos["action"] == "BUY"
+            ticket = pos.get("ticket")
+            if not ticket:
+                continue
+
+            sym = pos.get("symbol")
+            try:
+                # We need the price for the specific symbol of the position
+                price = get_current_price_fn(sym) if sym else get_current_price_fn()
+            except Exception as e:
+                logger.error(f"DCA: Failed to fetch price for {sym}: {e}")
+                continue
+
+            if not price:
+                continue
+            
+            is_buy = pos["action"] == "BUY" if "action" in pos else (pos["type"] == "BUY")
             current = price["bid"] if is_buy else price["ask"]
-            entry = pos["price"]
+            entry = float(pos["price"]) if "price" in pos else float(pos.get("open_price", 0))
+            if entry <= 0: continue
+
             pnl_pct = (
                 ((current - entry) / entry * 100)
                 if is_buy
                 else ((entry - current) / entry * 100)
             )
 
-            dca_count = pos.get("_dca_count", 0)
-            last_dca = pos.get("_last_dca_time", 0)
+            # Use persistent tracking instead of modifying the dict
+            dca_count = self._dca_counts.get(ticket, 0)
+            last_dca = self._dca_timestamps.get(ticket, 0.0)
 
             if dca_count >= max_dca or pnl_pct >= 0 or pnl_pct > trigger_pct:
                 continue
             if time.time() - last_dca < cooldown_min * 60:
                 continue
 
-            dca_vol = pos["volume"] * (increment_factor**dca_count)
-            total_cost = (pos["volume"] + dca_vol) * entry
-            balance = paper_balance if paper_trading else 10000
+            dca_vol = float(pos["volume"]) * (increment_factor**dca_count)
+            total_cost = (float(pos["volume"]) + dca_vol) * entry
+            balance = paper_balance
             if (total_cost / balance) * 100 > position_limit_pct:
                 continue
 
-            pos["_dca_count"] = dca_count + 1
-            pos["_last_dca_time"] = time.time()
-            logger.info(f"DCA: Adding {dca_vol} to {pos['ticket']}")
+            self._dca_counts[ticket] = dca_count + 1
+            self._dca_timestamps[ticket] = time.time()
+            logger.info(f"DCA: Adding {dca_vol} to {ticket}")
 
             return {
-                "ticket": pos["ticket"],
-                "symbol": pos["symbol"],
-                "side": pos["action"],
+                "ticket": ticket,
+                "symbol": sym,
+                "side": "BUY" if is_buy else "SELL",
                 "volume": dca_vol,
-                "dca_count": pos["_dca_count"],
+                "dca_count": self._dca_counts[ticket],
                 "entry_price": entry,
             }
 
@@ -89,7 +108,7 @@ class DCAManager:
             rpc_send_trade_alert_fn(
                 symbol=dca_info["symbol"],
                 action=f"DCA {dca_info['side']}",
-                price=dca_info.get("entry_price", 0),
+                price=result.get("price", dca_info.get("entry_price", 0)),
                 strategy="DCA",
                 regime=current_regime,
             )

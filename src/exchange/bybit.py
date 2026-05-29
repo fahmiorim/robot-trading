@@ -63,14 +63,14 @@ class BybitExchange(CCXTExchange):
 
     def __init__(
         self,
-        symbol: str = "BTC/USDT",
-        api_key: str = "",
-        secret: str = "",
-        password: str = "",
-        sandbox: bool = True,
-        category: str = "linear",
-        position_mode: str = "one-way",
-        default_leverage: int = 5,
+        symbol: str,
+        api_key: str,
+        secret: str,
+        password: str,
+        sandbox: bool,
+        category: str,
+        position_mode: str,
+        default_leverage: int,
         options: Optional[Dict] = None,
         **kwargs,
     ):
@@ -732,109 +732,6 @@ class BybitExchange(CCXTExchange):
         except Exception as e:
             logger.error(f"close_position error: {e}")
             return {"success": False, "error": str(e)}
-
-    # ── Position Modification (Trading Stop) ──────────────────
-
-    def modify_position(
-        self,
-        position_id: str,
-        sl: Optional[float] = None,
-        tp: Optional[float] = None,
-        symbol: Optional[str] = None,
-    ) -> bool:
-        """Set TP/SL on an existing position via Bybit's trading-stop.
-
-        Bybit has a dedicated /v5/position/trading-stop endpoint
-        that sets stop-loss and take-profit for an open position.
-        This is more reliable than placing separate conditional orders.
-
-        Args:
-            position_id: Position ID.
-            sl: Stop-loss price (None to leave unchanged).
-            tp: Take-profit price (None to leave unchanged).
-            symbol: Trading pair (auto-detected if None).
-
-        Returns:
-            True if successful.
-        """
-        if not self.ensure_connection():
-            return False
-
-        # Find the position to get symbol and positionIdx
-        positions = self.get_open_positions()
-        pos = None
-        for p in positions:
-            if p.get("id") == position_id or str(p.get("id", "")) == position_id:
-                pos = p
-                break
-
-        if not pos:
-            logger.warning(f"Position {position_id} not found for TP/SL")
-            return False
-
-        sym = symbol or pos.get("symbol", self.symbol)
-        sym = self._normalise_symbol(sym)
-
-        try:
-            # Use CCXT's edit_order or direct trading-stop via params
-            params: Dict[str, Any] = {
-                "category": self.category,
-                "positionIdx": pos.get("position_idx", self._position_idx(
-                    "buy" if pos.get("side") == "BUY" else "sell"
-                )),
-            }
-
-            if sl is not None:
-                params["stopLoss"] = str(self._normalise_price(sym, sl))
-                params["slTriggerBy"] = "MarkPrice"
-            if tp is not None:
-                params["takeProfit"] = str(self._normalise_price(sym, tp))
-                params["tpTriggerBy"] = "MarkPrice"
-
-            if not params.get("stopLoss") and not params.get("takeProfit"):
-                return False
-
-            if self._exchange and self._exchange.has.get("editOrder"):
-                # edit_order(id, symbol, type, side, amount, price=None, params={})
-                # We only want to update SL/TP, so pass None for type/side/amount/price
-                # and let params carry the TP/SL fields.
-                self._exchange.edit_order(
-                    position_id, sym, None, None, None,
-                    params=params,
-                )
-                logger.info(
-                    f"TP/SL set for {sym}: sl={sl}, tp={tp}"
-                )
-                return True
-
-            # Fallback: create conditional TP/SL orders
-            if sl is not None:
-                sl_side = "sell" if pos.get("side") == "BUY" else "buy"
-                self._exchange.create_order(
-                    sym, "stop", sl_side, pos.get("volume", 0),
-                    params={
-                        "category": self.category,
-                        "triggerPrice": str(sl),
-                        "positionIdx": pos.get("position_idx", 0),
-                        "reduceOnly": True,
-                    },
-                )
-            if tp is not None:
-                tp_side = "sell" if pos.get("side") == "BUY" else "buy"
-                self._exchange.create_order(
-                    sym, "take_profit", tp_side, pos.get("volume", 0),
-                    params={
-                        "category": self.category,
-                        "triggerPrice": str(tp),
-                        "positionIdx": pos.get("position_idx", 0),
-                        "reduceOnly": True,
-                    },
-                )
-            return True
-
-        except Exception as e:
-            logger.error(f"modify_position error: {e}")
-            return False
 
     # ── Balance Override ──────────────────────────────────────
 

@@ -47,10 +47,9 @@ class TradeRepository:
 
     def find_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Find a trade by ticket number."""
-        trades = self.find_all(limit=1000)
-        for t in trades:
-            if t.ticket == ticket:
-                return t
+        row = self._db.get_trade_by_ticket(ticket)
+        if row:
+            return Trade.from_dict(row)
         return None
 
     def summary(self, days: int = 30) -> Dict[str, Any]:

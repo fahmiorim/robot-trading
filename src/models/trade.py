@@ -40,15 +40,21 @@ class Trade:
 
     @property
     def pnl_pct(self) -> float:
-        if self.entry_price == 0:
+        if self.entry_price == 0 or self.volume == 0:
             return 0.0
-        multiplier = 1 if self.side == OrderSide.BUY else -1
-        return (self.profit / (self.entry_price * self.volume)) * 100 * multiplier
+        
+        if self.exit_price is not None:
+            if self.side == OrderSide.BUY:
+                return (self.exit_price - self.entry_price) / self.entry_price * 100
+            else:
+                return (self.entry_price - self.exit_price) / self.entry_price * 100
+        return 0.0
 
     @property
     def duration(self) -> float:
         start = self.entry_time
-        end = self.exit_time or datetime.now()
+        now = datetime.now(start.tzinfo) if start.tzinfo else datetime.now()
+        end = self.exit_time or now
         return (end - start).total_seconds() / 3600
 
     # ── Serialisation ──
@@ -78,7 +84,7 @@ class Trade:
     def from_dict(cls, d: Dict[str, Any]) -> "Trade":
         return cls(
             ticket=int(d.get('ticket', 0)),
-            symbol=d.get('symbol', 'XAUUSD'),
+            symbol=d.get('symbol', ''),
             side=OrderSide(d.get('action', 'BUY').upper()),
             volume=float(d.get('volume', 0)),
             entry_price=float(d.get('price', 0)),

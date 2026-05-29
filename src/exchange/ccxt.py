@@ -58,18 +58,22 @@ class CCXTExchange(IExchange):
 
     def __init__(
         self,
-        exchange_name: str = "binance",
-        symbol: str = "BTC/USDT",
+        exchange_name: str,
+        symbol: str,
+        default_sl_pct: float,
+        default_tp_pct: float,
         api_key: str = "",
         secret: str = "",
         password: str = "",
         sandbox: bool = True,
         options: Optional[Dict] = None,
         enable_rate_limit: bool = True,
-        magic_number: int = 2024,
+        magic_number: int = 0,
     ):
         self.exchange_name = exchange_name.lower()
         self.symbol = symbol
+        self.default_sl_pct = default_sl_pct
+        self.default_tp_pct = default_tp_pct
         self.api_key = api_key
         self.secret = secret
         self.password = password
@@ -715,60 +719,6 @@ class CCXTExchange(IExchange):
             logger.error(f"wait_for_new_candle error: {e}")
             return False
 
-    # ── Position Modification ─────────────────────────────────
-
-    def modify_position(
-        self,
-        position_id: str,
-        sl: Optional[float] = None,
-        tp: Optional[float] = None,
-        symbol: Optional[str] = None,
-    ) -> bool:
-        """Modify SL/TP on an open position.
-
-        CCXT doesn't have a universal method for this, so we use
-        exchange-specific params or cancel-recreate approach.
-        """
-        if not self.ensure_connection():
-            return False
-
-        try:
-            sym = self._normalise_symbol(symbol) if symbol else None
-            params: Dict[str, Any] = {}
-            if sl is not None:
-                params["stopLossPrice"] = sl
-            if tp is not None:
-                params["takeProfitPrice"] = tp
-
-            if params:
-                # Try editOrder if supported
-                if self._exchange and self._exchange.has.get("editOrder"):
-                    self._exchange.edit_order(position_id, sym, params=params)
-                    return True
-
-                # Otherwise, place a stop-loss/take-profit order
-                if sl is not None:
-                    position = None
-                    for p in self.get_open_positions():
-                        if p.get("id") == position_id:
-                            position = p
-                            break
-                    if position:
-                        side = "sell" if position.get("side") == "BUY" else "buy"
-                        self._exchange.create_order(
-                            sym or position.get("symbol", ""),
-                            type="stop_loss_limit",
-                            side=side,
-                            amount=position.get("volume", 0),
-                            price=sl,
-                            params={"stopPrice": sl},
-                        )
-                        return True
-            return False
-        except Exception as e:
-            logger.error(f"modify_position error: {e}")
-            return False
-
     # ── Symbol Listing ────────────────────────────────────────
 
     def get_symbols(self) -> List[str]:
@@ -813,15 +763,11 @@ class CCXTExchange(IExchange):
             return round(price, int(abs(np.log10(point))))
         return round(price, digits)
 
-    @staticmethod
-    def _default_sl(price: float, side: str, pct: float = 0.015) -> float:
-        """Default stop-loss 1.5% away."""
-        return price * (1 - pct) if side.upper() == "BUY" else price * (1 + pct)
+    def _default_sl(self, price: float, side: str) -> float:
+        return price * (1 - self.default_sl_pct) if side.upper() == "BUY" else price * (1 + self.default_sl_pct)
 
-    @staticmethod
-    def _default_tp(price: float, side: str, pct: float = 0.03) -> float:
-        """Default take-profit 3% away."""
-        return price * (1 + pct) if side.upper() == "BUY" else price * (1 - pct)
+    def _default_tp(self, price: float, side: str) -> float:
+        return price * (1 + self.default_tp_pct) if side.upper() == "BUY" else price * (1 - self.default_tp_pct)
 
     # ── Advanced Order Types ───────────────────────────────────
 

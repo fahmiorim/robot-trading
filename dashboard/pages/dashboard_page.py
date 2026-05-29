@@ -1,11 +1,12 @@
-﻿"""Dashboard overview page — bot status, risk summary, strategy signals, MT5 status."""
+"""Dashboard overview page — bot status, risk summary, strategy signals, MT5 status."""
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 
 from src.rpc.websocket import get_shared
 from dashboard.components import render_auto_trade_controls
-from dashboard.helpers import ensure_mt5
+from dashboard.helpers import ensure_mt5, get_available_symbols
 from dashboard.styles import _PREMIUM_CSS
 
 
@@ -226,6 +227,30 @@ def render():
                             document.getElementById('rt-risk-cb').innerHTML = cb ? '<span style="color:#ef4444; font-weight:700;">🔴 ACTIVE</span>' : '<span style="color:#10b981; font-weight:700;">✅ OK</span>';
                         }
                         
+                        // Real-time ML Training Toast
+                        if (d.ml_training && d.ml_training.timestamp) {
+                            const mt = d.ml_training;
+                            const toast = document.createElement('div');
+                            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:linear-gradient(135deg,rgba(99,102,241,0.95),rgba(139,92,246,0.95));border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:14px 20px;font-family:Outfit,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,0.4);backdrop-filter:blur(10px);max-width:360px;color:white;';
+                            toast.innerHTML = `
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span style="font-size:1.5rem;">🧠</span>
+                                    <div>
+                                        <div style="font-weight:700;font-size:0.85rem;">ML Training Selesai</div>
+                                        <div style="font-size:0.75rem;opacity:0.8;margin-top:2px;">
+                                            Accuracy: <strong>${(mt.accuracy * 100).toFixed(2)}%</strong>
+                                            · ${mt.model_type} · ${mt.n_samples} samples
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top:8px;display:flex;gap:8px;">
+                                    <button onclick="this.parentElement.parentElement.remove()" style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:white;border-radius:8px;padding:5px;font-size:0.7rem;cursor:pointer;font-weight:600;">Dismiss</button>
+                                </div>
+                            `;
+                            document.body.appendChild(toast);
+                            setTimeout(() => { if(toast.parentNode) toast.remove(); }, 6000);
+                        }
+                        
                         // Update Signals
                         if (d.signals) {
                             document.getElementById('rt-sig-base').innerHTML = mapSignal(d.signals.strategy);
@@ -294,7 +319,7 @@ def render():
     # Clean up empty lines from HTML
     realtime_panel_html_clean = "\n".join([line for line in realtime_panel_html.split("\n") if line.strip() != ""])
 
-    st.iframe(realtime_panel_html_clean, height=500)
+    components.html(realtime_panel_html_clean, height=500, scrolling=False)
 
     # ── Trading & Execution Controls ──
     st.subheader("💱 Trading & Execution")
@@ -310,7 +335,14 @@ def render():
             st.markdown("<h4 style='margin:0 0 8px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>💱 Manual Order Execution</h4>", unsafe_allow_html=True)
             mc1, mc2 = st.columns(2)
             with mc1:
-                manual_symbol = st.text_input("Symbol", value=config.get("general", "symbol"), key="manual_symbol")
+                avail_symbols = get_available_symbols()
+                current_sym = config.get("general", "symbol")
+                if avail_symbols:
+                    sym_idx = avail_symbols.index(current_sym) if current_sym in avail_symbols else 0
+                    manual_symbol = st.selectbox("Symbol", avail_symbols, index=sym_idx, key="manual_symbol")
+                else:
+                    manual_symbol = st.text_input("Symbol", value=current_sym, key="manual_symbol")
+                    st.caption("MT5 tidak terhubung — ketik manual")
             with mc2:
                 manual_volume = st.number_input("Volume", min_value=0.01, max_value=100.0, value=0.1, step=0.01, key="manual_vol")
             

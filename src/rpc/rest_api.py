@@ -36,14 +36,13 @@ class RestAPI:
 
     Usage::
 
-        api = RestAPI(bot, host="0.0.0.0", port=8080, api_key="secret")
+        api = RestAPI(bot, host, port, api_key)
         api.start()
         # ... bot runs ...
         api.stop()
     """
 
-    def __init__(self, bot: Any, host: str = "0.0.0.0",
-                 port: int = 8080, api_key: str = ""):
+    def __init__(self, bot: Any, host: str, port: int, api_key: str):
         self.bot = bot
         self.host = host
         self.port = port
@@ -114,7 +113,7 @@ class RestAPI:
             if getattr(self.bot, "auto_trading", False):
                 return {"status": "already_running"}
             self.bot.auto_trading = True
-            setattr(self.bot, "_last_cycle_time", time.time())
+            self.bot.system_service.mark_cycle_start()
             from src.rpc.websocket import set_shared
             set_shared("auto_trading", True)
             return {"status": "started"}

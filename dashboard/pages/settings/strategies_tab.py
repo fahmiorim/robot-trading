@@ -2,6 +2,7 @@
 Premium Strategies Tab — styled glass cards with param bounds & heat-map weight matrix.
 """
 import streamlit as st
+import textwrap
 
 # ── Strategy metadata ─────────────────────────────────────────
 STRATEGY_INFO = {
@@ -66,59 +67,49 @@ def _render_strategy_card(config, sname: str) -> bool:
     edited = False
 
     # ── Card wrapper ──
-    st.markdown(
-        f"""
-        <div class="glass-card" style="margin-bottom: 0.75rem; opacity: {'1' if enabled else '0.55'};">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
-                <span style="font-size: 1.4rem;">{info['icon']}</span>
-                <div style="flex: 1;">
-                    <span style="font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em;">{sname.replace('_', ' ')}</span>
-                    <div style="font-size: 0.7rem; opacity: 0.45; margin-top: 1px; line-height: 1.4;">{info['desc']}</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.container(border=True):
+        card_col1, card_col2 = st.columns([0.65, 0.35], vertical_alignment="center")
+        with card_col1:
+            st.markdown(f"**{info['icon']} {sname.replace('_', ' ')}**")
+            st.caption(info['desc'])
+        with card_col2:
+            en = st.checkbox(f"Enable {sname}", enabled, key=f"strat_{sname}", label_visibility="collapsed")
+        if en != enabled:
+            config.set("strategies", sname, "enabled", en)
+            edited = True
+            st.rerun()
 
-    # Toggle
-    en = st.checkbox(f"Enable {sname}", enabled, key=f"strat_{sname}")
-    if en != enabled:
-        config.set("strategies", sname, "enabled", en)
-        edited = True
-        st.rerun()
-
-    if en:
-        # Parameters grid
-        param_keys = list(info["params"].keys())
-        cols = st.columns(3)
-        for i, pk in enumerate(param_keys):
-            meta = info["params"][pk]
-            v = params.get(pk)
-            with cols[i]:
-                if isinstance(v, float):
-                    nv = st.number_input(
-                        meta["label"],
-                        min_value=meta["min"],
-                        max_value=meta["max"],
-                        value=float(v),
-                        step=meta["step"],
-                        key=f"{sname}_{pk}",
-                        help=meta.get("help"),
-                    )
-                else:  # int
-                    nv = st.number_input(
-                        meta["label"],
-                        min_value=meta["min"],
-                        max_value=meta["max"],
-                        value=int(v),
-                        step=int(meta["step"]),
-                        key=f"{sname}_{pk}",
-                        help=meta.get("help"),
-                    )
-                if nv != v:
-                    config.set("strategies", sname, pk, nv)
-                    edited = True
+        if en:
+            # Parameters grid
+            param_keys = list(info["params"].keys())
+            cols = st.columns(3)
+            for i, pk in enumerate(param_keys):
+                meta = info["params"][pk]
+                v = params.get(pk)
+                with cols[i]:
+                    if isinstance(v, float):
+                        nv = st.number_input(
+                            meta["label"],
+                            min_value=meta["min"],
+                            max_value=meta["max"],
+                            value=float(v),
+                            step=meta["step"],
+                            key=f"{sname}_{pk}",
+                            help=meta.get("help"),
+                        )
+                    else:  # int
+                        nv = st.number_input(
+                            meta["label"],
+                            min_value=meta["min"],
+                            max_value=meta["max"],
+                            value=int(v),
+                            step=int(meta["step"]),
+                            key=f"{sname}_{pk}",
+                            help=meta.get("help"),
+                        )
+                    if nv != v:
+                        config.set("strategies", sname, pk, nv)
+                        edited = True
 
     return edited
 
@@ -133,13 +124,13 @@ def _render_weights(config) -> bool:
     st.caption("Adjust how heavily each strategy influences decisions under different market conditions.")
 
     st.markdown(
-        f"""
+        textwrap.dedent(f"""
         <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 0.6rem 1rem; margin-top: 0.25rem;">
             <div style="display: flex; gap: 6px; margin-bottom: 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
                 <div style="width: 80px; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.4; align-self: center;">Regime</div>
                 {''.join(f'<div style="flex: 1; text-align: center; font-size: 0.7rem; font-weight: 600; opacity: 0.6;">{STRATEGY_INFO.get(s, {}).get("icon", "")} {s.replace("_", " ")}</div>' for s in strats)}
             </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -177,12 +168,12 @@ def render(config) -> bool:
 
     # Intro banner
     st.markdown(
-        """
+        textwrap.dedent("""
         <div class="info-banner">
             <div class="title">\U0001f9e0 Konfigurasi Strategi</div>
             <div class="desc">Aktifkan/nonaktifkan strategi dan atur parameter masing-masing. Sesuaikan bobot per regime di bawah untuk mengontrol pengaruh tiap strategi.</div>
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -191,11 +182,9 @@ def render(config) -> bool:
     with col_left:
         for sname in STRATEGY_ORDER[:3]:
             edited |= _render_strategy_card(config, sname)
-            st.markdown('<div style="height: 4px;"></div>', unsafe_allow_html=True)
     with col_right:
         for sname in STRATEGY_ORDER[3:]:
             edited |= _render_strategy_card(config, sname)
-            st.markdown('<div style="height: 4px;"></div>', unsafe_allow_html=True)
 
     # Weights matrix
     edited |= _render_weights(config)
