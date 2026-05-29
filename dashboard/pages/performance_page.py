@@ -52,8 +52,10 @@ def render():
                     st.info("No trade history in database")
             else:
                 if ensure_mt5():
-                    history = get_trade_history(days)
-                    if history is not None and len(history) > 0:
+                    history_raw = get_trade_history(days)
+                    if history_raw is not None and len(history_raw) > 0:
+                        # history_raw is List[Dict] — konversi ke DataFrame
+                        history = pd.DataFrame(history_raw) if isinstance(history_raw, list) else history_raw
                         st.dataframe(history, use_container_width=True)
                         profit_col = next((c for c in ['profit', 'Profit', 'pnl', 'P&L'] if c in history.columns), None)
                         if profit_col:
