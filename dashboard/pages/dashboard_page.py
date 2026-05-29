@@ -142,7 +142,24 @@ def render():
         
         function connect(){
             try {
-                ws = new WebSocket('ws://' + window.location.hostname + ':' + wsPort);
+                let host = window.location.hostname;
+                if (!host || host === "null" || host === "") {
+                    try {
+                        if (window.parent && window.parent.location && window.parent.location.hostname) {
+                            host = window.parent.location.hostname;
+                        }
+                    } catch(e) {
+                        if (document.referrer) {
+                            try {
+                                host = new URL(document.referrer).hostname;
+                            } catch(_) {}
+                        }
+                    }
+                }
+                if (!host) {
+                    host = "localhost";
+                }
+                ws = new WebSocket('ws://' + host + ':' + wsPort);
                 ws.onmessage = function(e){
                     try {
                         const d = JSON.parse(e.data);
