@@ -87,21 +87,4 @@ def render(config) -> bool:
             config.set("general", "magic_number", mn)
             edited = True
 
-    st.markdown("---")
-    dc1, dc2 = st.columns(2)
-    with dc1:
-        v = config.get("dashboard", "port")
-        nv = st.number_input("Dashboard Port", 1024, 65535, int(v))
-        if nv != v:
-            config.set("dashboard", "port", nv)
-            edited = True
-    with dc2:
-        v = config.get("dashboard", "theme")
-        nv = st.selectbox("Dashboard Theme", ["dark", "light"], 0 if v == "dark" else 1)
-        if nv != v:
-            config.set("dashboard", "theme", nv)
-            edited = True
-
-
-
     return edited

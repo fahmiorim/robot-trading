@@ -10,8 +10,8 @@ STRATEGY_INFO = {
         "icon": "\U0001f4c8",
         "desc": "Buy saat MA cepat crossing di atas MA lambat, Sell saat sebaliknya.",
         "params": {
-            "fast_period": {"label": "Fast MA Period", "min": 5, "max": 30, "step": 1, "help": "Periode MA cepat untuk deteksi tren"},
-            "slow_period": {"label": "Slow MA Period", "min": 10, "max": 60, "step": 1, "help": "Periode MA lambat — harus > fast period"},
+            "fast_period": {"label": "Fast MA Period", "min": 3, "max": 40, "step": 1, "help": "Periode MA cepat untuk deteksi tren"},
+            "slow_period": {"label": "Slow MA Period", "min": 10, "max": 80, "step": 1, "help": "Periode MA lambat — harus > fast period"},
         },
     },
     "RSI": {
@@ -28,7 +28,7 @@ STRATEGY_INFO = {
         "desc": "Buy saat MACD crossing di atas signal line, Sell saat sebaliknya.",
         "params": {
             "fast": {"label": "Fast EMA", "min": 8, "max": 20, "step": 1, "help": "Periode EMA cepat untuk MACD"},
-            "slow": {"label": "Slow EMA", "min": 20, "max": 40, "step": 1, "help": "Periode EMA lambat — harus > fast"},
+            "slow": {"label": "Slow EMA", "min": 20, "max": 50, "step": 1, "help": "Periode EMA lambat — harus > fast"},
             "signal": {"label": "Signal Line", "min": 5, "max": 15, "step": 1, "help": "Periode EMA untuk signal line"},
         },
     },
@@ -44,7 +44,7 @@ STRATEGY_INFO = {
         "icon": "\u26a1",
         "desc": "Buy saat harga break di atas high terbaru, Sell saat break di bawah low.",
         "params": {
-            "lookback": {"label": "Lookback Period", "min": 10, "max": 40, "step": 1, "help": "Jumlah candle untuk menentukan range"},
+            "lookback": {"label": "Lookback Period", "min": 5, "max": 50, "step": 1, "help": "Jumlah candle untuk menentukan range"},
         },
     },
 }

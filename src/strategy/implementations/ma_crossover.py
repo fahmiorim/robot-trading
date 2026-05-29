@@ -7,8 +7,8 @@ from src.analysis.indicators import calculate_sma
 class MACrossoverStrategy(IStrategy):
     strategy_id = "MA_Crossover"
     param_space = {
-        'fast_period': (5, 30, 'int'),
-        'slow_period': (10, 60, 'int'),
+        'fast_period': (3, 40, 'int'),
+        'slow_period': (10, 80, 'int'),
     }
 
     def __init__(self, fast_period: int, slow_period: int):

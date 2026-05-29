@@ -163,6 +163,49 @@ class WebSocketRPC(IRPC):
                                 "success": False,
                                 "message": f"Failed to close position: {result.get('error', 'Unknown error')}"
                             }))
+                    elif action == "start_auto_trade" and getattr(self, "bot", None):
+                        logger.info("WS client requested start auto trading")
+                        if self.bot.exchange.connect() and self.bot.exchange.is_connected():
+                            self.bot.config.set("general", "auto_trade", True)
+                            self.bot.config.save()
+                            set_shared("auto_trading", True)
+                            worker = getattr(self.bot, "worker", None)
+                            if worker:
+                                worker.start()
+                            with self._lock:
+                                if self.latest_data and "status" in self.latest_data:
+                                    self.latest_data["status"]["auto_trading"] = True
+                            if self.latest_data:
+                                await self._do_broadcast(self.latest_data)
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": True,
+                                "message": "Auto Trading started!"
+                            }))
+                        else:
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": False,
+                                "message": "Failed to start Auto Trading: MT5 connection failed!"
+                            }))
+                    elif action == "stop_auto_trade" and getattr(self, "bot", None):
+                        logger.info("WS client requested stop auto trading")
+                        self.bot.config.set("general", "auto_trade", False)
+                        self.bot.config.save()
+                        set_shared("auto_trading", False)
+                        worker = getattr(self.bot, "worker", None)
+                        if worker:
+                            worker.stop()
+                        with self._lock:
+                            if self.latest_data and "status" in self.latest_data:
+                                self.latest_data["status"]["auto_trading"] = False
+                        if self.latest_data:
+                            await self._do_broadcast(self.latest_data)
+                        await ws.send(json.dumps({
+                            "type": "action_result",
+                            "success": True,
+                            "message": "Auto Trading stopped!"
+                        }))
                 except Exception as e:
                     logger.error(f"WS message handling error: {e}")
         except websockets.exceptions.ConnectionClosed:
@@ -273,7 +316,8 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                         "symbol": p.get("symbol"),
                         "type": p.get("type", p.get("action", "")),
                         "volume": p.get("volume"),
-                        "price": p.get("price"),
+                        "price": p.get("price") or p.get("open_price"),
+                        "current_price": p.get("current_price"),
                         "sl": p.get("sl"),
                         "tp": p.get("tp"),
                         "profit": p.get("profit", 0)
@@ -316,7 +360,8 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                         "mt5_connected": mt5_connected,
                         "cycles": cycles,
                         "timeframe": config.get("general", "timeframe"),
-                        "paper_trading": paper_trading
+                        "paper_trading": paper_trading,
+                        "last_cycle_time": getattr(getattr(bot, "system_service", None), "last_cycle_time", 0.0)
                     },
                     "signals": {
                         "strategy": sig_strat,

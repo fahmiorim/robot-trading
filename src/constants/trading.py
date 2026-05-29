@@ -46,7 +46,6 @@ class MLModelType(str, Enum):
     """Available ML model types."""
     RANDOM_FOREST = "random_forest"
     GRADIENT_BOOSTING = "gradient_boosting"
-    LSTM = "lstm"
 
 
 class TradeMode(IntEnum):

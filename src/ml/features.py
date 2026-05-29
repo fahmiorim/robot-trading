@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
 
-from src.analysis.indicators import calculate_rsi, calculate_sma, calculate_ema, \
+from src.analysis.indicators import calculate_sma, calculate_ema, \
     calculate_bollinger_bands, calculate_adx, calculate_macd, calculate_atr
 from src.configuration.manager import ConfigManager
 
@@ -21,13 +21,12 @@ class FeatureEngineer:
     """
 
     DEFAULT_FEATURES: List[str] = [
-        "returns_1", "returns_5", "returns_10",
-        "sma_10", "sma_20", "sma_50",
-        "ema_12", "ema_26",
-        "rsi_14",
+        "returns_1",
+        "sma_10", "sma_50",
+        "ema_12",
         "bb_upper", "bb_lower", "bb_width",
         "adx_14",
-        "macd", "macd_signal", "macd_hist",
+        "macd", "macd_hist",
         "atr_14",
         "volume_change",
         "volatility_10", "volatility_20",
@@ -48,25 +47,16 @@ class FeatureEngineer:
         features = pd.DataFrame(index=data.index)
 
         ret_period_1 = self.config.get("features", "returns_period_1")
-        ret_period_5 = self.config.get("features", "returns_period_5")
-        ret_period_10 = self.config.get("features", "returns_period_10")
 
         features["returns_1"] = close.pct_change(ret_period_1)
-        features["returns_5"] = close.pct_change(ret_period_5)
-        features["returns_10"] = close.pct_change(ret_period_10)
 
         sma_fast = self.config.get("agent", "sma_fast_period")
-        sma_medium = self.config.get("features", "sma_medium_period")
         sma_slow = self.config.get("agent", "sma_slow_period")
 
         # Relative SMAs & EMAs (fractional difference from close price)
         features["sma_10"] = (close - calculate_sma(close, sma_fast)) / close
-        features["sma_20"] = (close - calculate_sma(close, sma_medium)) / close
         features["sma_50"] = (close - calculate_sma(close, sma_slow)) / close
         features["ema_12"] = (close - calculate_ema(close, self.config.get("features", "ema_fast_period"))) / close
-        features["ema_26"] = (close - calculate_ema(close, self.config.get("features", "ema_slow_period"))) / close
-
-        features["rsi_14"] = calculate_rsi(close, self.config.get("features", "rsi_period"))
 
         bb_period = self.config.get("features", "bb_period")
         bb_std = self.config.get("features", "bb_std_dev")
@@ -75,14 +65,13 @@ class FeatureEngineer:
         features["bb_lower"] = (close - bb_lower) / close
         features["bb_width"] = (bb_upper - bb_lower) / close
 
-        features["adx_14"] = calculate_adx(high, low, close, self.config.get("features", "adx_period"))
+        features["adx_14"] = calculate_adx(high, low, close, self.config.get("risk_management", "adx_period"))
 
         macd_fast = self.config.get("features", "macd_fast_period")
         macd_slow = self.config.get("features", "macd_slow_period")
         macd_signal_period = self.config.get("features", "macd_signal_period")
-        macd_line, signal_line, hist = calculate_macd(close, macd_fast, macd_slow, macd_signal_period)
+        macd_line, _, hist = calculate_macd(close, macd_fast, macd_slow, macd_signal_period)
         features["macd"] = macd_line / close
-        features["macd_signal"] = signal_line / close
         features["macd_hist"] = hist / close
 
         features["atr_14"] = calculate_atr(high, low, close, self.config.get("features", "atr_period")) / close

@@ -205,7 +205,7 @@ class ConfigManager:
             errors.append(f"risk_management.max_open_positions: {max_pos} out of range")
 
         model = self.get("ml", "model_type")
-        valid = {"random_forest", "gradient_boosting", "lstm"}
+        valid = {"random_forest", "gradient_boosting"}
         if model and model not in valid:
             errors.append(f"ml.model_type: '{model}' not in {valid}")
 

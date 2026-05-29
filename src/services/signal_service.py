@@ -7,6 +7,8 @@ import pandas as pd
 from src.models.signal import SignalResult, AggregatedSignal
 from src.constants.trading import SignalType, SIGNAL_LABELS
 from src.utils.logging import get_logger
+from src.ml.agent_pipeline import get_agent_signal
+from src.ml.swarm_intelligence import get_swarm_signal
 
 logger = get_logger(__name__)
 
@@ -114,12 +116,18 @@ class SignalService:
         return SignalType.BUY if sum(sigs) > 0 else SignalType.SELL if sum(sigs) < 0 else SignalType.HOLD
 
     def _ml_signal(self, data: pd.DataFrame, ml_trainer: Any) -> int:
-        """Get signal from ML model prediction."""
+        """Get signal from ML model prediction.
+
+        ml_trainer.predict() returns int: 1=BUY, -1=SELL, 0=HOLD
+        """
         try:
             if hasattr(ml_trainer, 'predict') and ml_trainer.is_trained:
-                pred = ml_trainer.predict(data)
-                if pred is not None:
-                    return SignalType.BUY if pred > 0.5 else SignalType.SELL if pred < -0.5 else SignalType.HOLD
+                label = ml_trainer.predict(data)  # returns int
+                if label == 1:
+                    return SignalType.BUY
+                elif label == -1:
+                    return SignalType.SELL
+                return SignalType.HOLD
         except Exception as e:
             logger.warning(f"ML signal failed: {e}")
         return SignalType.HOLD
@@ -127,7 +135,6 @@ class SignalService:
     def _agent_signal(self, data: pd.DataFrame, config: Optional[Any] = None) -> int:
         """Get signal from AI agent (placeholder)."""
         try:
-            from src.ml.agent_pipeline import get_agent_signal
             return get_agent_signal(data, config=config)
         except Exception as e:
             logger.warning(f"Agent signal failed: {e}")
@@ -136,7 +143,6 @@ class SignalService:
     def _swarm_signal(self, data: pd.DataFrame, config: Optional[Any] = None) -> int:
         """Get signal from swarm intelligence (placeholder)."""
         try:
-            from src.ml.swarm_intelligence import get_swarm_signal
             return get_swarm_signal(data, config=config)
         except Exception as e:
             logger.warning(f"Swarm signal failed: {e}")

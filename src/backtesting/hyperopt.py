@@ -95,8 +95,8 @@ class Hyperopt:
 
         param_space = dict(getattr(strategy_cls, "param_space", {}))
         if optimize_risk:
-            param_space['stop_loss_pct'] = (0.1, 5.0, 'float')
-            param_space['take_profit_pct'] = (0.2, 15.0, 'float')
+            param_space['stop_loss_pct'] = (0.5, 5.0, 'float')
+            param_space['take_profit_pct'] = (0.5, 15.0, 'float')
 
         if not param_space:
             logger.warning(f"{strategy_cls.__name__} has no param_space defined")
@@ -236,8 +236,8 @@ class Hyperopt:
                         optimize_risk: bool = False) -> "HyperoptResult":
         param_space = dict(getattr(strategy_cls, "param_space", {}))
         if optimize_risk:
-            param_space['stop_loss_pct'] = (0.1, 5.0, 'float')
-            param_space['take_profit_pct'] = (0.2, 15.0, 'float')
+            param_space['stop_loss_pct'] = (0.5, 5.0, 'float')
+            param_space['take_profit_pct'] = (0.5, 15.0, 'float')
         best_params = {}
         best_score = float("inf")
         t0 = time.time()

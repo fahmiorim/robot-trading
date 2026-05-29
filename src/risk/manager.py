@@ -212,6 +212,8 @@ class RiskManager:
             "window_loss_pct": round(
                 max(0, self.daily_loss_pct) if self._last_trade_time > 0 else 0, 2
             ),
+            "max_drawdown_limit_pct": max_dd,
+            "max_daily_loss_limit_pct": max_daily,
         })
         return result
 

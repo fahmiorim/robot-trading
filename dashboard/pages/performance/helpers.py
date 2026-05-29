@@ -19,7 +19,7 @@ def _info_banner(title: str, desc: str):
 
 def _metrics_bar(*items):
     """Render compact metrics row from (label, value, color) tuples."""
-    sep = '<div style="width:1px; height:22px; background:rgba(255,255,255,0.08);">'
+    sep = '<div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>'
     cells = ""
     for idx, (lbl, val, col) in enumerate(items):
         if idx > 0:

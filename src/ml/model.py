@@ -123,10 +123,16 @@ class MLModel:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, shuffle=False
         )
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
-        self.model.fit(X_train_scaled, y_train)
-        preds = self.model.predict(X_test_scaled)
+        
+        # Thread-safe scaling & model fitting: use temporary instances
+        from sklearn.preprocessing import StandardScaler
+        temp_scaler = StandardScaler()
+        X_train_scaled = temp_scaler.fit_transform(X_train)
+        X_test_scaled = temp_scaler.transform(X_test)
+        
+        model_to_fit = self._init_model()
+        model_to_fit.fit(X_train_scaled, y_train)
+        preds = model_to_fit.predict(X_test_scaled)
         accuracy = float(accuracy_score(y_test, preds))
         
         # Calculate class distribution stats on target values
@@ -141,6 +147,9 @@ class MLModel:
             }
         }
         
+        # Atomic update of model attributes to prevent multi-threaded AttributeError/ValueError
+        self.scaler = temp_scaler
+        self.model = model_to_fit
         self.is_trained = True
         logger.info(f"ML model trained: accuracy={accuracy:.2%}")
 
@@ -242,13 +251,29 @@ class MLModel:
     # ── Persistence ───────────────────────────────────────────
 
     def save(self, filepath: str) -> None:
-        joblib.dump({"model": self.model, "scaler": self.scaler}, filepath)
-        logger.info(f"ML model saved to {filepath}")
+        timeframe = self.config.get("general", "timeframe")
+        joblib.dump({
+            "model": self.model,
+            "scaler": self.scaler,
+            "timeframe": timeframe
+        }, filepath)
+        logger.info(f"ML model saved to {filepath} with timeframe {timeframe}")
 
     def load(self, filepath: str) -> bool:
         """Load model from disk. Returns True on success."""
         try:
             loaded = joblib.load(filepath)
+            
+            # Validate timeframe if stored in model file
+            timeframe_in_file = loaded.get("timeframe")
+            current_timeframe = self.config.get("general", "timeframe")
+            if timeframe_in_file and timeframe_in_file != current_timeframe:
+                logger.warning(
+                    f"ML model timeframe mismatch: file has {timeframe_in_file}, "
+                    f"but config has {current_timeframe}. Forcing retrain."
+                )
+                return False
+
             scaler = loaded["scaler"]
 
             # Validate feature count to avoid StandardScaler shape mismatch errors
@@ -264,7 +289,7 @@ class MLModel:
             self.model = loaded["model"]
             self.scaler = scaler
             self.is_trained = True
-            logger.info(f"ML model loaded from {filepath}")
+            logger.info(f"ML model loaded from {filepath} (timeframe={timeframe_in_file or 'legacy'})")
             return True
         except Exception as e:
             logger.warning(f"Failed to load ML model from {filepath}: {e}")

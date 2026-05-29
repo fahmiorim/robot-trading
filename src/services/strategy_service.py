@@ -92,7 +92,11 @@ class StrategyService:
         return results
 
     def validate_strategies(self, data: pd.DataFrame) -> Dict[str, bool]:
-        """Validate strategies against minimum performance thresholds."""
+        """Validate strategies against minimum performance thresholds.
+        
+        Strategies that fail are added to disabled_strategies but NOT removed
+        from self.strategies — they will be reconsidered each cycle.
+        """
         if not self.config.get("trading", "strategy_pre_validation"):
             return {n: True for n in self.strategies}
 
@@ -102,7 +106,7 @@ class StrategyService:
         min_wr = self.config.get("trading", "min_win_rate")
         max_dd = self.config.get("trading", "max_backtest_drawdown")
 
-        for name, strategy in list(self.strategies.items()):
+        for name, strategy in self.strategies.items():
             try:
                 signals = strategy.calculate_signals(data)
                 r = self.backtester.run(data, signals, name)
@@ -116,18 +120,16 @@ class StrategyService:
                 if issues:
                     logger.warning(f"{name} FAILED: {', '.join(issues)}")
                     self.disabled_strategies.append(name)
-                    del self.strategies[name]
                     results[name] = False
                 else:
                     results[name] = True
             except Exception as e:
                 logger.error(f"{name} error: {e}")
                 self.disabled_strategies.append(name)
-                del self.strategies[name]
                 results[name] = False
 
         if self.disabled_strategies:
-            logger.warning(f"Disabled: {self.disabled_strategies}")
+            logger.warning(f"Disabled (this cycle): {self.disabled_strategies}")
         return results
 
     # ── Regime Detection ──

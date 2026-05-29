@@ -8,13 +8,13 @@ ML_INFO = {
     "model_type": {
         "icon": "🧠",
         "label": "Tipe Model",
-        "help": "Pilih algoritma ML: Random Forest (serbaguna), Gradient Boosting (akurasi tinggi), atau LSTM (time-series).",
+        "help": "Pilih algoritma ML: Gradient Boosting (direkomendasikan — akurasi lebih tinggi untuk M1 scalping) atau Random Forest (serbaguna).",
     },
     "retrain_interval_hours": {
         "icon": "🔄",
         "label": "Retrain (jam)",
         "min": 1, "max": 168, "step": 1,
-        "help": "Frekuensi retrain model. Scalping M1: 6–12 jam. Timeframe tinggi: 24 jam.",
+        "help": "Frekuensi retrain model. Scalping M1-M15: 4 jam. Timeframe tinggi (H1+): 12-24 jam.",
     },
     "n_estimators": {
         "icon": "🌲",
@@ -26,88 +26,94 @@ ML_INFO = {
         "icon": "🌳",
         "label": "Max Depth",
         "min": 1, "max": 50, "step": 1,
-        "help": "Kedalaman maksimum pohon. 5 = pohon pendek (generalize lebih baik). None (0) = unlimited (risiko overfit tinggi).",
+        "help": "Kedalaman maksimum pohon. 3 untuk GradientBoosting M1 — lebih generalize. 5-10 untuk Random Forest. None = unlimited (risiko overfit).",
     },
     "min_samples_split": {
         "icon": "🧩",
         "label": "Min Split",
         "min": 2, "max": 50, "step": 1,
-        "help": "Jumlah sampel minimal untuk membelah node. 2 = sensitif, 20 = lebih smooth. Nilai 5-10 kurangi overfit.",
+        "help": "Jumlah sampel minimal untuk membelah node. M1 noise tinggi — 5 lebih aman dari overfit dibanding 2. Range 5-10 rekomendasi scalping.",
     },
     "classification_threshold": {
         "icon": "🎯",
         "label": "Min Threshold",
         "min": 0.0, "max": 0.02, "step": 0.0001, "format": "%.4f",
-        "help": "Batas minimum return untuk label Buy/Sell. 0.0005 = 0.05%. Direkomendasikan 0.0 agar ATR adaptif bekerja optimal.",
+        "help": "Batas minimum return untuk label Buy/Sell. Set 0.0 agar threshold ATR-adaptif bekerja penuh — threshold otomatis = ATR% × atr_mult. Distribusi kelas jadi ~35-40% HOLD, ideal untuk M1.",
     },
     "atr_multiplier": {
         "icon": "📐",
         "label": "ATR Multiplier",
         "min": 0.05, "max": 2.0, "step": 0.05, "format": "%.2f",
-        "help": "Proporsi ATR untuk threshold adaptif. 0.2 = 20% dari ATR. Semakin kecil = semakin banyak sinyal BUY/SELL.",
-    },
-    "test_size": {
-        "icon": "📊",
-        "label": "Test Size",
-        "min": 0.05, "max": 0.5, "step": 0.05,
-        "help": "Proporsi data untuk validasi. 0.2 = 80% training, 20% testing.",
-    },
-    "random_state": {
-        "icon": "🎲",
-        "label": "Random Seed",
-        "min": 0, "max": 9999, "step": 1,
-        "help": "Seed untuk reproducibility. Ganti jika ingin variasi training.",
+        "help": "Proporsi ATR untuk threshold adaptif. M1-M15 semakin kecil = lebih banyak sinyal. 0.20 = 20% ATR — optimal untuk scalping.",
     },
 }
 
-LSTM_INFO = {
-    "sequence_length": {
-        "icon": "📏",
-        "label": "Panjang Sequence",
-        "min": 10, "max": 200, "step": 5,
-        "help": "Jumlah candle lookback untuk LSTM. M1: 60 (1 jam). M15: 30 (7.5 jam).",
+FEATURES_INFO = {
+    "returns_period_1": {
+        "icon": "📊",
+        "label": "Returns Period 1",
+        "min": 1, "max": 50, "step": 1,
+        "help": "Periode return jangka pendek untuk fitur. M1: 1 = return 1 menit.",
     },
-    "hidden_size": {
-        "icon": "🔲",
-        "label": "Hidden Size",
-        "min": 16, "max": 256, "step": 16,
-        "help": "Ukuran hidden layer LSTM. Lebih besar = lebih kompleks.",
+    "ema_fast_period": {
+        "icon": "📈",
+        "label": "EMA Fast",
+        "min": 2, "max": 50, "step": 1,
+        "help": "Periode EMA cepat. 12 standar untuk MACD.",
     },
-    "num_layers": {
-        "icon": "📚",
-        "label": "Jumlah Layer",
-        "min": 1, "max": 5, "step": 1,
-        "help": "Jumlah stacked LSTM layers. 2–3 cukup untuk scalping.",
-    },
-    "epochs": {
-        "icon": "🔁",
-        "label": "Epochs",
+    "ema_slow_period": {
+        "icon": "📈",
+        "label": "EMA Slow",
         "min": 5, "max": 200, "step": 5,
-        "help": "Jumlah epoch training. 50 cukup untuk dataset kecil.",
+        "help": "Periode EMA lambat. 26 standar untuk MACD.",
     },
-    "batch_size": {
-        "icon": "📦",
-        "label": "Batch Size",
-        "min": 8, "max": 256, "step": 8,
-        "help": "Ukuran batch training. 32 standar, lebih kecil untuk dataset kecil.",
+    "rsi_period": {
+        "icon": "📉",
+        "label": "RSI Period",
+        "min": 5, "max": 50, "step": 1,
+        "help": "Periode RSI. 14 standar, 9 lebih sensitif untuk scalping M1.",
     },
-    "learning_rate": {
-        "icon": "⚡",
-        "label": "Learning Rate",
-        "min": 0.0001, "max": 0.1, "step": 0.0001, "format": "%.4f",
-        "help": "Kecepatan learning. 0.001 standar Adam. Turunkan jika loss naik.",
+    "bb_period": {
+        "icon": "📊",
+        "label": "BB Period",
+        "min": 5, "max": 100, "step": 5,
+        "help": "Periode Bollinger Bands. 20 standar, 15 lebih responsif di M1.",
     },
-    "classification_threshold": {
-        "icon": "🎯",
-        "label": "Min Threshold",
-        "min": 0.0, "max": 0.01, "step": 0.0001, "format": "%.4f",
-        "help": "Batas minimum return untuk label Buy/Hold/Sell LSTM. 0.0 agar ATR adaptif bekerja.",
-    },
-    "atr_multiplier": {
+    "bb_std_dev": {
         "icon": "📐",
-        "label": "ATR Multiplier",
-        "min": 0.05, "max": 2.0, "step": 0.05, "format": "%.2f",
-        "help": "Proporsi ATR untuk threshold adaptif LSTM. Default 0.2 = 20% dari ATR.",
+        "label": "BB Std Dev",
+        "min": 1.0, "max": 5.0, "step": 0.1,
+        "help": "Jumlah standar deviasi untuk BB. 2.0 standar, 1.5 lebih ketat di M1.",
+    },
+    "macd_fast_period": {
+        "icon": "🔄",
+        "label": "MACD Fast",
+        "min": 2, "max": 50, "step": 1,
+        "help": "Periode EMA cepat MACD. 12 standar.",
+    },
+    "macd_slow_period": {
+        "icon": "🔄",
+        "label": "MACD Slow",
+        "min": 10, "max": 100, "step": 5,
+        "help": "Periode EMA lambat MACD. 26 standar.",
+    },
+    "macd_signal_period": {
+        "icon": "🔄",
+        "label": "MACD Signal",
+        "min": 2, "max": 30, "step": 1,
+        "help": "Periode signal line MACD. 9 standar.",
+    },
+    "atr_period": {
+        "icon": "📏",
+        "label": "ATR Period",
+        "min": 5, "max": 50, "step": 1,
+        "help": "Periode ATR untuk mengukur volatilitas. 14 standar.",
+    },
+    "volatility_window_fast": {
+        "icon": "🌊",
+        "label": "Volatility Window",
+        "min": 5, "max": 100, "step": 5,
+        "help": "Rolling window cepat untuk kalkulasi volatilitas harga. M1: 10 = 10 menit.",
     },
 }
 
@@ -126,21 +132,21 @@ def _render_card(config, section: str, key: str, info: dict) -> bool:
             st.caption(info.get("help", ""))
         with c2:
             if key == "model_type":
-                opts = ["random_forest", "gradient_boosting", "lstm"]
+                opts = ["random_forest", "gradient_boosting"]
                 idx = opts.index(v) if v in opts else 0
-                nv = st.selectbox("", opts, idx, key=f"{section}_{key}", label_visibility="collapsed")
+                nv = st.selectbox(info["label"], opts, idx, key=f"{section}_{key}", label_visibility="collapsed")
                 if nv != v:
                     config.set(section, key, nv)
                     edited = True
             elif is_int:
-                nv = st.number_input("", info["min"], info["max"], int(v), int(info.get("step", 1)),
+                nv = st.number_input(info["label"], info["min"], info["max"], int(v), int(info.get("step", 1)),
                                      key=f"{section}_{key}", label_visibility="collapsed")
                 if nv != v:
                     config.set(section, key, nv)
                     edited = True
             else:
                 step = info.get("step", 0.001)
-                nv = st.number_input("", info["min"], info["max"], float(v), step,
+                nv = st.number_input(info["label"], info["min"], info["max"], float(v), step,
                                      format=fmt, key=f"{section}_{key}", label_visibility="collapsed")
                 if nv != v:
                     config.set(section, key, nv)
@@ -412,40 +418,69 @@ def render(config) -> bool:
         textwrap.dedent("""
         <div class="info-banner">
             <div class="title">🧠 Machine Learning</div>
-            <div class="desc">Konfigurasi model ML dan LSTM untuk prediksi arah harga. Parameter otomatis disesuaikan untuk scalping timeframe M1–M15.</div>
+            <div class="desc">Konfigurasi model ML untuk prediksi arah harga. Parameter otomatis disesuaikan untuk scalping timeframe M1–M15.</div>
         </div>
         """),
         unsafe_allow_html=True,
     )
 
     st.markdown("### 🤖 Model ML")
-    st.caption("Random Forest, Gradient Boosting, atau LSTM — atur arsitektur dan hyperparameter.")
+    st.caption("Random Forest atau Gradient Boosting — atur arsitektur dan hyperparameter.")
 
     ml_keys = ["model_type", "retrain_interval_hours", "n_estimators",
                "max_depth", "min_samples_split",
-               "classification_threshold", "atr_multiplier", "test_size", "random_state"]
+               "classification_threshold", "atr_multiplier"]
     cols = st.columns(2)
     for i, k in enumerate(ml_keys):
         with cols[i % 2]:
             edited |= _render_card(config, "ml", k, ML_INFO[k])
-
-    st.markdown("---")
-    st.markdown("### 🔬 LSTM (Deep Learning)")
-    st.caption("Arsitektur LSTM untuk analisis time-series — sequence, layer, dan hyperparameter.")
-
-    lstm_keys = ["sequence_length", "hidden_size", "num_layers",
-                 "epochs", "batch_size", "learning_rate",
-                 "classification_threshold", "atr_multiplier"]
-    cols = st.columns(2)
-    for i, k in enumerate(lstm_keys):
-        with cols[i % 2]:
-            edited |= _render_card(config, "lstm", k, LSTM_INFO[k])
 
     st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
     st.markdown("### 📈 Riwayat Training")
     st.caption("Visualisasi riwayat training dari database — akurasi, distribusi kelas, dan feature importance evolution.")
 
     _render_training_history(config)
+
+    st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
+
+    # ── Feature Engineering ──
+    with st.expander("🧬 Feature Engineering", expanded=False):
+        st.caption(
+            "Parameter feature engineering untuk ML pipeline. Menentukan periode kalkulasi indikator "
+            "teknikal yang digunakan sebagai fitur input model. Semua nilai disesuaikan untuk M1–M15."
+        )
+
+        st.markdown("**📊 Returns Period**")
+        st.caption("Return harga 1 candle — cukup untuk M1 karena return 5 dan 10 dihapus (terlalu lambat).")
+        edited |= _render_card(config, "features", "returns_period_1", FEATURES_INFO["returns_period_1"])
+
+        st.markdown("**📈 Moving Averages**")
+        st.caption("Moving averages untuk trend detection. SMA medium dibaca dari config Agent.")
+        cols = st.columns(2)
+        for i, k in enumerate(["ema_fast_period", "ema_slow_period"]):
+            with cols[i]:
+                edited |= _render_card(config, "features", k, FEATURES_INFO[k])
+
+        st.markdown("**📉 Oscillators**")
+        st.caption("RSI dan Bollinger Bands untuk momentum & volatilitas. ADX dibaca dari config Risk.")
+        cols = st.columns(3)
+        for i, k in enumerate(["rsi_period", "bb_period", "bb_std_dev"]):
+            with cols[i]:
+                edited |= _render_card(config, "features", k, FEATURES_INFO[k])
+
+        st.markdown("**🔄 MACD**")
+        st.caption("Periode fast, slow, dan signal line MACD.")
+        cols = st.columns(3)
+        for i, k in enumerate(["macd_fast_period", "macd_slow_period", "macd_signal_period"]):
+            with cols[i]:
+                edited |= _render_card(config, "features", k, FEATURES_INFO[k])
+
+        st.markdown("**🌊 Volatility**")
+        st.caption("ATR dan rolling window volatilitas.")
+        cols = st.columns(2)
+        for i, k in enumerate(["atr_period", "volatility_window_fast"]):
+            with cols[i]:
+                edited |= _render_card(config, "features", k, FEATURES_INFO[k])
 
     st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
     

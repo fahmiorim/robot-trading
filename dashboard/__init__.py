@@ -33,38 +33,60 @@ from dashboard.helpers import cleanup_mt5
 logger = get_logger("dashboard")
 
 
-# Global bot instance to be shared across all sessions
-_global_robot = None
-_global_worker = None
-_global_lock = threading.Lock()
+import sys
+
+class SharedState:
+    @property
+    def robot(self):
+        return getattr(sys, "_global_robot", None)
+    
+    @robot.setter
+    def robot(self, value):
+        sys._global_robot = value
+        
+    @property
+    def worker(self):
+        return getattr(sys, "_global_worker", None)
+        
+    @worker.setter
+    def worker(self, value):
+        sys._global_worker = value
+
+    @property
+    def lock(self):
+        if not hasattr(sys, "_global_lock"):
+            sys._global_lock = threading.Lock()
+        return sys._global_lock
+
+shared_state = SharedState()
+
 
 def _init_session_state():
     """Initialize Streamlit session state variables."""
-    global _global_robot, _global_worker
-
     if "config" not in st.session_state:
         st.session_state.config = ConfigManager()
 
     config = st.session_state.config
 
-    with _global_lock:
-        if _global_robot is None:
+    with shared_state.lock:
+        if shared_state.robot is None:
             logger.info("Initializing global TradingController...")
-            _global_robot = TradingController(config=config)
+            shared_state.robot = TradingController(config=config)
         
-        if _global_worker is None:
+        if shared_state.worker is None:
             logger.info("Initializing global Worker...")
-            _global_worker = Worker(_global_robot)
+            shared_state.worker = Worker(shared_state.robot)
+            shared_state.robot.worker = shared_state.worker
 
-    st.session_state.robot = _global_robot
-    st.session_state.worker = _global_worker
+    st.session_state.robot = shared_state.robot
+    st.session_state.worker = shared_state.worker
 
     if "dashboard_ctrl" not in st.session_state:
         st.session_state.dashboard_ctrl = DashboardController(config=config)
 
     defaults = {
         "mt5_initialized": False,
-        "auto_trading_enabled": False,
+        "auto_trading_enabled": config.get("general", "auto_trade"),
         "last_refresh": 0.0,
         "last_auto_cycle_time": time.time(),
         "backtest_results": {},
@@ -75,9 +97,9 @@ def _init_session_state():
             st.session_state[k] = v
 
     # Start worker only after session state is fully initialized
-    with _global_lock:
-        if _global_worker is not None and config.get("general", "auto_trade"):
-            _global_worker.start()
+    with shared_state.lock:
+        if shared_state.worker is not None and config.get("general", "auto_trade"):
+            shared_state.worker.start()
 
 
 def _render_sidebar():

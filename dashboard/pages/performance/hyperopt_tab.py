@@ -2,10 +2,157 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import urllib.parse
 import plotly.graph_objects as go
+from streamlit_autorefresh import st_autorefresh
 from dashboard.helpers import refresh_robot
+from dashboard.pages.performance.hyperopt_runner import get_hyperopt_runner
 from src.controllers.dashboard_controller import DashboardController
 from dashboard.pages.performance.helpers import _clean_html, _info_banner, _metrics_bar
+
+def _render_progress_ui(runner_status):
+    if runner_status["status"] == "fetching":
+        st.info(f"🔄 Mengunduh {runner_status['candles_count']} candle data market {runner_status['timeframe']} dari MetaTrader 5...")
+        st.progress(0)
+    
+    elif runner_status["status"] == "optimizing":
+        current_trial = runner_status["current_trial"]
+        total_trials = runner_status["total_trials"]
+        best_score = runner_status["best_score"]
+        best_params = runner_status["best_params"]
+        current_score = runner_status["current_score"]
+        current_params = runner_status["current_params"]
+        strategy_name = runner_status["current_strategy"]
+        strategy_idx = runner_status["strategy_index"]
+        total_strats = runner_status["total_strategies"]
+        
+        pct = int((current_trial / max(1, total_trials)) * 100)
+        
+        st.progress(current_trial / max(1, total_trials))
+        st.info(f"🧬 Mengoptimasi {strategy_name}... ({strategy_idx}/{total_strats})")
+        
+        # Format best params
+        best_rows = []
+        for k, v in best_params.items():
+            val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+            best_rows.append(
+                f"<div style='background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
+                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
+                f"<div style='font-size: 0.82rem; font-weight: 700; color: #10b981;'>{val_str}</div>"
+                f"</div>"
+            )
+        best_params_html = "".join(best_rows)
+        
+        # Format current params
+        current_rows = []
+        for k, v in current_params.items():
+            val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+            current_rows.append(
+                f"<div style='background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
+                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
+                f"<div style='font-size: 0.82rem; font-weight: 700; color: #a5b4fc;'>{val_str}</div>"
+                f"</div>"
+            )
+        current_params_html = "".join(current_rows)
+        
+        html = f"""
+        <div style="
+            background: rgba(17, 25, 40, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            margin-bottom: 20px;
+            background-image: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
+            font-family: 'Outfit', sans-serif;
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #a855f7; box-shadow: 0 0 10px #a855f7;"></span>
+                    <span style="font-size: 0.95rem; font-weight: 800; color: #e0e7ff; letter-spacing: 0.05em; text-transform: uppercase;">
+                        🧬 OPTIMIZING {strategy_name}
+                    </span>
+                </div>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.2);">
+                    Trial {current_trial} / {total_trials}
+                </span>
+            </div>
+            
+            <!-- Glowing Progress Bar -->
+            <div style="width: 100%; background-color: rgba(255, 255, 255, 0.05); border-radius: 10px; height: 6px; margin-bottom: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="width: {pct}%; background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%); height: 100%; border-radius: 10px; box-shadow: 0 0 12px #a855f7;"></div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <!-- Left Column: Best So Far -->
+                <div style="background: rgba(16, 185, 129, 0.02); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 10px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">🏆 Best So Far</span>
+                        <span style="font-size: 0.85rem; font-weight: 800; color: #10b981;">{best_score:.4f}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
+                        {best_params_html}
+                    </div>
+                </div>
+                
+                <!-- Right Column: Current Trial -->
+                <div style="background: rgba(99, 102, 241, 0.02); border: 1px solid rgba(99, 102, 241, 0.1); border-radius: 10px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">⚡ Testing Current</span>
+                        <span style="font-size: 0.85rem; font-weight: 800; color: #a5b4fc;">{current_score:.4f}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
+                        {current_params_html}
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        st.markdown(_clean_html(html), unsafe_allow_html=True)
+        
+        # Plot convergence
+        history = runner_status["convergence_history"]
+        if history:
+            trials = [h["Trial"] for h in history]
+            best_scores = [h["Best Score"] for h in history]
+            current_scores = [h["Current Score"] for h in history]
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=trials, y=current_scores,
+                name="Trial Score",
+                mode="markers",
+                marker=dict(color="rgba(165, 180, 252, 0.5)", size=6)
+            ))
+            fig.add_trace(go.Scatter(
+                x=trials, y=best_scores,
+                name="Best Score (Convergence)",
+                mode="lines+markers",
+                line=dict(color="#10b981", width=2),
+                marker=dict(color="#10b981", size=6)
+            ))
+            fig.update_layout(
+                height=240,
+                margin=dict(l=40, r=20, t=15, b=30),
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                xaxis=dict(title="Trial", gridcolor="rgba(255,255,255,0.05)"),
+                yaxis=dict(title="Score", gridcolor="rgba(255,255,255,0.05)")
+            )
+            st.plotly_chart(fig, width='stretch')
+
+@st.fragment()
+def show_progress_fragment():
+    st_autorefresh(interval=2000, limit=None, key="hyperopt_refresh")
+    runner = get_hyperopt_runner()
+    runner_status = runner.get_status()
+    if not runner_status["running"] and runner_status["status"] in ["completed", "failed", "stopped"]:
+        st.rerun()
+    _render_progress_ui(runner_status)
 
 def render(config):
     _info_banner("🧬 Parameter Hyperopt",
@@ -54,356 +201,59 @@ def render(config):
                 key="ho_opt_risk",
                 help="Ikut sertakan Stop Loss dan Take Profit dalam pencarian parameter terbaik"
             )
-            disabled = st.session_state.hyperopt_running
-            if st.button("🧬 RUN HYPEROPT", width='stretch', type="primary", disabled=disabled):
+            # Get runner status
+            runner = get_hyperopt_runner()
+            runner_status = runner.get_status()
+            
+            # Sync session state
+            if runner_status["running"]:
                 st.session_state.hyperopt_running = True
-                st.rerun()
-
-    if st.session_state.hyperopt_running:
-        from src.data.provider import DataProvider
-        ho_tf = st.session_state.get("ho_timeframe", "TIMEFRAME_M5")
-        ho_c_count = int(st.session_state.get("ho_candles", 10000))
-
-        with st.spinner(f"🔄 Mengunduh {ho_c_count} candle data market {ho_tf} dari MetaTrader 5..."):
-            try:
-                local_provider = DataProvider(
-                    exchange=st.session_state.robot.exchange,
-                    symbol=st.session_state.robot.symbol,
-                    timeframe=ho_tf,
-                    default_count=ho_c_count
-                )
-                data = local_provider.fetch(force_refresh=True)
-                st.toast(f"✅ Data market {ho_tf} ({len(data)} candle) berhasil diambil!", icon="✅")
-            except Exception as e:
-                st.error(f"❌ Gagal mengambil data market: {e}")
-                st.session_state.hyperopt_running = False
-                st.rerun()
-
-        from src.backtesting.hyperopt import HyperoptEngine
-        from src.strategy.interface import IStrategy as BaseStrategy
-        from src.backtesting.engine import Backtester
-
-        engine = HyperoptEngine(config, Backtester(config))
-        ho_results = {}
-
-        if ho_strategy == "All":
-            registry = BaseStrategy.get_registry()
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            realtime_placeholder = st.empty()
-            plotly_placeholder = st.empty()
-
-            for idx, (sid, strat_cls) in enumerate(registry.items()):
-                if not hasattr(strat_cls, 'param_space') or not strat_cls.param_space:
-                    continue
-                status_text.info(f"🧬 Mengoptimasi {sid}... ({idx + 1}/{len(registry)})")
-                
-                def make_callback(strategy_name):
-                    history = []
-                    def update_ui(current, total, best_score, best_params, current_score=0.0, current_params=None):
-                        pct = int((current / total) * 100)
-                        
-                        history.append({
-                            "Trial": current,
-                            "Best Score": best_score,
-                            "Current Score": current_score
-                        })
-                        
-                        # Format best params
-                        best_rows = []
-                        for k, v in best_params.items():
-                            v_clean = v.item() if hasattr(v, 'item') else v
-                            val_str = f"{v_clean:.4f}" if isinstance(v_clean, float) else str(v_clean)
-                            best_rows.append(
-                                f"<div style='background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
-                                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
-                                f"<div style='font-size: 0.82rem; font-weight: 700; color: #10b981;'>{val_str}</div>"
-                                f"</div>"
-                            )
-                        best_params_html = "".join(best_rows)
-                        
-                        # Format current params
-                        current_params = current_params or best_params
-                        current_rows = []
-                        for k, v in current_params.items():
-                            v_clean = v.item() if hasattr(v, 'item') else v
-                            val_str = f"{v_clean:.4f}" if isinstance(v_clean, float) else str(v_clean)
-                            current_rows.append(
-                                f"<div style='background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
-                                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
-                                f"<div style='font-size: 0.82rem; font-weight: 700; color: #a5b4fc;'>{val_str}</div>"
-                                f"</div>"
-                            )
-                        current_params_html = "".join(current_rows)
-                        
-                        html = f"""
-                        <div style="
-                            background: rgba(17, 25, 40, 0.75);
-                            backdrop-filter: blur(12px);
-                            -webkit-backdrop-filter: blur(12px);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 16px;
-                            padding: 20px;
-                            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-                            margin-bottom: 20px;
-                            background-image: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
-                            font-family: 'Outfit', sans-serif;
-                        ">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #a855f7; box-shadow: 0 0 10px #a855f7;"></span>
-                                    <span style="font-size: 0.95rem; font-weight: 800; color: #e0e7ff; letter-spacing: 0.05em; text-transform: uppercase;">
-                                        🧬 OPTIMIZING {strategy_name}
-                                    </span>
-                                </div>
-                                <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.2);">
-                                    Trial {current} / {total}
-                                </span>
-                            </div>
-                            
-                            <!-- Glowing Progress Bar -->
-                            <div style="width: 100%; background-color: rgba(255, 255, 255, 0.05); border-radius: 10px; height: 6px; margin-bottom: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: {pct}%; background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%); height: 100%; border-radius: 10px; box-shadow: 0 0 12px #a855f7;"></div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                                <!-- Left Column: Best So Far -->
-                                <div style="background: rgba(16, 185, 129, 0.02); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 10px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">🏆 Best So Far</span>
-                                        <span style="font-size: 0.85rem; font-weight: 800; color: #10b981;">{best_score:.4f}</span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
-                                        {best_params_html}
-                                    </div>
-                                </div>
-                                
-                                <!-- Right Column: Current Trial -->
-                                <div style="background: rgba(99, 102, 241, 0.02); border: 1px solid rgba(99, 102, 241, 0.1); border-radius: 10px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">⚡ Testing Current</span>
-                                        <span style="font-size: 0.85rem; font-weight: 800; color: #a5b4fc;">{current_score:.4f}</span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
-                                        {current_params_html}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        """
-                        realtime_placeholder.markdown(_clean_html(html), unsafe_allow_html=True)
-                        
-                        # Plot convergence
-                        trials = [h["Trial"] for h in history]
-                        best_scores = [h["Best Score"] for h in history]
-                        current_scores = [h["Current Score"] for h in history]
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=trials, y=current_scores,
-                            name="Trial Score",
-                            mode="markers",
-                            marker=dict(color="rgba(165, 180, 252, 0.5)", size=6)
-                        ))
-                        fig.add_trace(go.Scatter(
-                            x=trials, y=best_scores,
-                            name="Best Score (Convergence)",
-                            mode="lines+markers",
-                            line=dict(color="#10b981", width=2),
-                            marker=dict(color="#10b981", size=6)
-                        ))
-                        fig.update_layout(
-                            height=240,
-                            margin=dict(l=40, r=20, t=15, b=30),
-                            template="plotly_dark",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                            xaxis=dict(title="Trial", gridcolor="rgba(255,255,255,0.05)"),
-                            yaxis=dict(title="Score", gridcolor="rgba(255,255,255,0.05)")
-                        )
-                        plotly_placeholder.plotly_chart(fig, width='stretch')
-                        
-                    return update_ui
-
-                try:
-                    trials_for_strat = max(20, ho_trials // len(registry))
-                    result = engine.optimize(
-                        strat_cls, data, 
-                        n_trials=trials_for_strat,
-                        callback=make_callback(sid),
-                        optimize_risk=st.session_state.get("ho_opt_risk", False)
-                    )
-                    ho_results[sid] = {
-                        'params': result.best_params,
-                        'score': result.best_score,
-                        'metrics': result.best_results,
-                        'n_trials': len(result.trials),
-                        'elapsed': result.total_elapsed,
-                    }
-                except Exception as e:
-                    st.error(f"{sid} hyperopt gagal: {e}")
-                progress_bar.progress((idx + 1) / len(registry))
-
-            status_text.success("✅ Semua strategi selesai dioptimasi!")
-            realtime_placeholder.empty()
-            plotly_placeholder.empty()
-        else:
-            registry = BaseStrategy.get_registry()
-            if ho_strategy in registry:
-                strat_cls = registry[ho_strategy]
-                if hasattr(strat_cls, 'param_space') and strat_cls.param_space:
-                    realtime_placeholder = st.empty()
-                    plotly_placeholder = st.empty()
-                    history = []
-                    
-                    def update_ui(current, total, best_score, best_params, current_score=0.0, current_params=None):
-                        pct = int((current / total) * 100)
-                        
-                        history.append({
-                            "Trial": current,
-                            "Best Score": best_score,
-                            "Current Score": current_score
-                        })
-                        
-                        # Format best params
-                        best_rows = []
-                        for k, v in best_params.items():
-                            v_clean = v.item() if hasattr(v, 'item') else v
-                            val_str = f"{v_clean:.4f}" if isinstance(v_clean, float) else str(v_clean)
-                            best_rows.append(
-                                f"<div style='background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
-                                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
-                                f"<div style='font-size: 0.82rem; font-weight: 700; color: #10b981;'>{val_str}</div>"
-                                f"</div>"
-                            )
-                        best_params_html = "".join(best_rows)
-                        
-                        # Format current params
-                        current_params = current_params or best_params
-                        current_rows = []
-                        for k, v in current_params.items():
-                            v_clean = v.item() if hasattr(v, 'item') else v
-                            val_str = f"{v_clean:.4f}" if isinstance(v_clean, float) else str(v_clean)
-                            current_rows.append(
-                                f"<div style='background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); padding: 6px; border-radius: 6px; text-align: center;'>"
-                                f"<div style='font-size: 0.6rem; opacity: 0.5; text-transform: uppercase;'>{k}</div>"
-                                f"<div style='font-size: 0.82rem; font-weight: 700; color: #a5b4fc;'>{val_str}</div>"
-                                f"</div>"
-                            )
-                        current_params_html = "".join(current_rows)
-                        
-                        html = f"""
-                        <div style="
-                            background: rgba(17, 25, 40, 0.75);
-                            backdrop-filter: blur(12px);
-                            -webkit-backdrop-filter: blur(12px);
-                            border: 1px solid rgba(255, 255, 255, 0.1);
-                            border-radius: 16px;
-                            padding: 20px;
-                            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-                            margin-bottom: 20px;
-                            background-image: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
-                            font-family: 'Outfit', sans-serif;
-                        ">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #a855f7; box-shadow: 0 0 10px #a855f7;"></span>
-                                    <span style="font-size: 0.95rem; font-weight: 800; color: #e0e7ff; letter-spacing: 0.05em; text-transform: uppercase;">
-                                        🧬 OPTIMIZING {ho_strategy}
-                                    </span>
-                                </div>
-                                <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.2);">
-                                    Trial {current} / {total}
-                                </span>
-                            </div>
-                            
-                            <!-- Glowing Progress Bar -->
-                            <div style="width: 100%; background-color: rgba(255, 255, 255, 0.05); border-radius: 10px; height: 6px; margin-bottom: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="width: {pct}%; background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%); height: 100%; border-radius: 10px; box-shadow: 0 0 12px #a855f7;"></div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                                <!-- Left Column: Best So Far -->
-                                <div style="background: rgba(16, 185, 129, 0.02); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 10px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">🏆 Best So Far</span>
-                                        <span style="font-size: 0.85rem; font-weight: 800; color: #10b981;">{best_score:.4f}</span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
-                                        {best_params_html}
-                                    </div>
-                                </div>
-                                
-                                <!-- Right Column: Current Trial -->
-                                <div style="background: rgba(99, 102, 241, 0.02); border: 1px solid rgba(99, 102, 241, 0.1); border-radius: 10px; padding: 12px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                        <span style="font-size: 0.68rem; color: #9ca3af; font-weight: 700; text-transform: uppercase;">⚡ Testing Current</span>
-                                        <span style="font-size: 0.85rem; font-weight: 800; color: #a5b4fc;">{current_score:.4f}</span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px;">
-                                        {current_params_html}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        """
-                        realtime_placeholder.markdown(_clean_html(html), unsafe_allow_html=True)
-                        
-                        # Plot convergence
-                        trials = [h["Trial"] for h in history]
-                        best_scores = [h["Best Score"] for h in history]
-                        current_scores = [h["Current Score"] for h in history]
-                        
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=trials, y=current_scores,
-                            name="Trial Score",
-                            mode="markers",
-                            marker=dict(color="rgba(165, 180, 252, 0.5)", size=6)
-                        ))
-                        fig.add_trace(go.Scatter(
-                            x=trials, y=best_scores,
-                            name="Best Score (Convergence)",
-                            mode="lines+markers",
-                            line=dict(color="#10b981", width=2),
-                            marker=dict(color="#10b981", size=6)
-                        ))
-                        fig.update_layout(
-                            height=240,
-                            margin=dict(l=40, r=20, t=15, b=30),
-                            template="plotly_dark",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                            xaxis=dict(title="Trial", gridcolor="rgba(255,255,255,0.05)"),
-                            yaxis=dict(title="Score", gridcolor="rgba(255,255,255,0.05)")
-                        )
-                        plotly_placeholder.plotly_chart(fig, width='stretch')
-                                
-                    result = engine.optimize(
-                        strat_cls, data, 
-                        n_trials=ho_trials, 
-                        callback=update_ui,
-                        optimize_risk=st.session_state.get("ho_opt_risk", False)
-                    )
-                    ho_results[ho_strategy] = {
-                        'params': result.best_params,
-                        'score': result.best_score,
-                        'metrics': result.best_results,
-                        'n_trials': len(result.trials),
-                        'elapsed': result.total_elapsed,
-                    }
-                    realtime_placeholder.empty()
-                    plotly_placeholder.empty()
-                else:
-                    st.error(f"{ho_strategy} tidak memiliki param_space")
             else:
-                st.error(f"Strategy '{ho_strategy}' tidak ditemukan di registry")
+                if runner_status["status"] == "completed" and runner_status["results"] and not st.session_state.get("ho_results"):
+                    st.session_state.ho_results = runner_status["results"]
+                    st.session_state.hyperopt_running = False
+                elif runner_status["status"] in ["failed", "stopped", "idle"]:
+                    st.session_state.hyperopt_running = False
 
-        st.session_state.ho_results = ho_results
-        st.session_state.hyperopt_running = False
-        st.rerun()
+            # Render button based on status
+            if st.session_state.hyperopt_running:
+                if st.button("⏹️ STOP HYPEROPT", width='stretch', type="secondary"):
+                    runner.stop()
+                    st.toast("⚠️ Meminta penghentian optimasi...", icon="🔄")
+                    st.rerun()
+            else:
+                if st.button("🧬 RUN HYPEROPT", width='stretch', type="primary"):
+                    st.session_state.ho_results = {}
+                    # Trigger background thread
+                    ho_tf = st.session_state.get("ho_timeframe", "TIMEFRAME_M5")
+                    ho_c_count = int(st.session_state.get("ho_candles", 10000))
+                    ho_t_count = int(st.session_state.get("ho_trials", 100))
+                    
+                    robot_inst = st.session_state.robot
+                    runner.start(
+                        config=config,
+                        robot=robot_inst,
+                        strategy=ho_strategy,
+                        timeframe=ho_tf,
+                        candles_count=ho_c_count,
+                        trials=ho_t_count,
+                        optimize_risk=st.session_state.get("ho_opt_risk", False)
+                    )
+                    st.session_state.hyperopt_running = True
+                    st.rerun()
+
+    # Re-evaluate runner status for visual rendering
+    runner = get_hyperopt_runner()
+    runner_status = runner.get_status()
+
+    if st.session_state.hyperopt_running or runner_status["status"] in ["fetching", "optimizing"]:
+        show_progress_fragment()
+    
+    elif runner_status["status"] == "failed":
+        st.error(f"❌ Hyperopt gagal: {runner_status['error_message']}")
+        
+    elif runner_status["status"] == "stopped":
+        st.warning("⚠️ Optimasi dihentikan oleh pengguna.")
 
     ho_results = st.session_state.get("ho_results", {})
     if ho_results:

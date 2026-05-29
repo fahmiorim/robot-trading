@@ -40,7 +40,7 @@ def render():
         ("🧠", "Multi-Strategy Core",
          "5 technical strategies: MA Crossover, RSI Momentum, MACD Histogram, Bollinger Bands, Breakout Detection"),
         ("🤖", "ML Integration",
-         "Random Forest, Gradient Boosting & LSTM single-step prediction with automatic retraining"),
+         "Random Forest & Gradient Boosting single-step prediction with automatic retraining"),
         ("🔍", "Market Regime Filter",
          "ADX-based regime classifier detects Trending, Ranging, or Choppy conditions in real-time"),
         ("🐝", "Swarm Intelligence",

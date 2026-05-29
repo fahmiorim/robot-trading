@@ -79,6 +79,7 @@ class Backtester:
         trailing_sl = 0.0
         last_sl = self.sl_pct
         entry_time = None
+        entry_comm = 0.0
 
         for i in range(len(data)):
             price = float(data["close"].iloc[i])
@@ -106,7 +107,7 @@ class Backtester:
                             "time": data.index[i], "action": "SELL (Trail SL)",
                             "price": trailing_sl,
                             "profit_pct": (trailing_sl - entry_price) / entry_price * 100,
-                            "profit": pnl - comm - (position_size * entry_price),
+                            "profit": pnl - comm - (position_size * entry_price) - entry_comm,
                             "entry_time": entry_time,
                         })
                         position = 0
@@ -121,7 +122,7 @@ class Backtester:
                 pnl = self._check_sltp(position, entry_price, high, low,
                                        price, position_size, trades, data.index[i],
                                        sl_pct=last_sl, entry_already_deducted=True,
-                                       entry_time=entry_time)
+                                       entry_time=entry_time, entry_comm=entry_comm)
                 if pnl is not None:
                     balance += pnl
                     position = 0
@@ -143,7 +144,7 @@ class Backtester:
                         "time": data.index[i], "action": "BUY (cover)",
                         "price": price,
                         "profit_pct": (entry_price - price) / entry_price * 100,
-                        "profit": profit_val,
+                        "profit": profit_val - entry_comm,
                         "entry_time": entry_time,
                     })
                     position = 0
@@ -163,6 +164,7 @@ class Backtester:
                 trailing_sl = 0.0
                 last_sl = self.sl_pct
                 entry_time = data.index[i]
+                entry_comm = comm
                 trades.append({
                     "time": data.index[i], "action": "BUY",
                     "price": entry_price, "size": position_size,
@@ -179,7 +181,7 @@ class Backtester:
                         "time": data.index[i], "action": "SELL",
                         "price": price,
                         "profit_pct": (price - entry_price) / entry_price * 100,
-                        "profit": profit_val - (position_size * entry_price),
+                        "profit": profit_val - (position_size * entry_price) - entry_comm,
                         "entry_time": entry_time,
                     })
                     position = 0
@@ -199,6 +201,7 @@ class Backtester:
                 balance += entry_price * position_size - comm
                 position = -1
                 entry_time = data.index[i]
+                entry_comm = comm
                 trades.append({
                     "time": data.index[i], "action": "SELL (short)",
                     "price": entry_price, "size": position_size,
@@ -223,7 +226,10 @@ class Backtester:
             equity_curve[-1] = balance
             pnl_pct = (last_price - entry_price) / entry_price * 100 if position == 1 \
                 else (entry_price - last_price) / entry_price * 100
-            trade_profit = pnl - comm - (position_size * entry_price if position == 1 else -position_size * entry_price)
+            if position == 1:
+                trade_profit = pnl - comm - (position_size * entry_price) - entry_comm
+            else:
+                trade_profit = (entry_price - last_price) * position_size - comm - entry_comm
             trades.append({
                 "time": data.index[-1], "action": f"CLOSE {'LONG' if position == 1 else 'SHORT'} (end)",
                 "price": last_price,
@@ -266,19 +272,21 @@ class Backtester:
             r_mean = float(np.mean(arr))
             r_std = float(np.std(arr))
             if r_std > 0:
+                # Standard Sortino downside deviation: penalize returns below 0
+                downside_diff = np.minimum(0, arr)
+                downside_dev = float(np.sqrt(np.mean(downside_diff ** 2)))
+                
                 if data_years >= ANNUALIZE_THRESHOLD_YEARS:  # ≥ threshold → annualized
                     annual_factor = (len(returns) / max(data_years, 0.001)) ** 0.5
                     sharpe = round(r_mean / r_std * annual_factor, 3)
-                    downside = arr[arr < 0]
-                    if len(downside) > 0 and np.std(downside) > 0:
-                        sortino = round(r_mean / float(np.std(downside)) * annual_factor, 3)
+                    if downside_dev > 0:
+                        sortino = round(r_mean / downside_dev * annual_factor, 3)
                     else:
                         sortino = 0.0
                 else:  # < 1 bulan → raw (non-annualized)
                     sharpe = round(r_mean / r_std, 3)
-                    downside = arr[arr < 0]
-                    if len(downside) > 0 and np.std(downside) > 0:
-                        sortino = round(r_mean / float(np.std(downside)), 3)
+                    if downside_dev > 0:
+                        sortino = round(r_mean / downside_dev, 3)
                     else:
                         sortino = 0.0
             else:
@@ -412,7 +420,7 @@ class Backtester:
     # ── Internal helpers ──────────────────────────────────────
 
     def _check_sltp(self, position, entry, high, low, price, size, trades, idx,
-                    sl_pct=None, entry_already_deducted=False, entry_time=None):
+                    sl_pct=None, entry_already_deducted=False, entry_time=None, entry_comm=0.0):
         sl_pct = sl_pct or self.sl_pct
         tp_pct = self.tp_pct
 
@@ -422,7 +430,7 @@ class Backtester:
             if low <= sl:
                 pnl = size * sl
                 comm = sl * size * (self.commission_pct / 100.0)
-                profit_val = pnl - comm - (size * entry)
+                profit_val = pnl - comm - (size * entry) - entry_comm
                 trades.append({"time": idx, "action": "SELL (SL)",
                                "price": sl,
                                "profit_pct": (sl - entry) / entry * 100,
@@ -432,7 +440,7 @@ class Backtester:
             elif high >= tp:
                 pnl = size * tp
                 comm = tp * size * (self.commission_pct / 100.0)
-                profit_val = pnl - comm - (size * entry)
+                profit_val = pnl - comm - (size * entry) - entry_comm
                 trades.append({"time": idx, "action": "SELL (TP)",
                                "price": tp,
                                "profit_pct": (tp - entry) / entry * 100,
@@ -444,7 +452,7 @@ class Backtester:
             tp = entry * (1 - tp_pct / 100.0)
             if high >= sl:
                 comm = sl * size * (self.commission_pct / 100.0)
-                profit_val = (entry - sl) * size - comm
+                profit_val = (entry - sl) * size - comm - entry_comm
                 trades.append({"time": idx, "action": "BUY (SL)",
                                "price": sl,
                                "profit_pct": (entry - sl) / entry * 100,
@@ -455,7 +463,7 @@ class Backtester:
                 return profit_val
             elif low <= tp:
                 comm = tp * size * (self.commission_pct / 100.0)
-                profit_val = (entry - tp) * size - comm
+                profit_val = (entry - tp) * size - comm - entry_comm
                 trades.append({"time": idx, "action": "BUY (TP)",
                                "price": tp,
                                "profit_pct": (entry - tp) / entry * 100,

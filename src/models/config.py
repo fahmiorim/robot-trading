@@ -7,12 +7,12 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class ExchangeConfig:
     type: str
-    name: str
-    api_key: str
-    secret: str
-    password: str
-    sandbox: bool
-    options: Optional[Dict]
+    name: str = ""
+    api_key: str = ""
+    secret: str = ""
+    password: str = ""
+    sandbox: bool = False
+    options: Optional[Dict] = None
 
 
 @dataclass

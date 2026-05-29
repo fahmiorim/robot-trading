@@ -6,7 +6,7 @@ from src.strategy.interface import IStrategy
 class BreakoutStrategy(IStrategy):
     strategy_id = "Breakout"
     param_space = {
-        'lookback': (10, 40, 'int'),
+        'lookback': (5, 50, 'int'),
     }
 
     def __init__(self, lookback: int):

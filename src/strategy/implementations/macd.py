@@ -7,8 +7,8 @@ from src.analysis.indicators import calculate_ema
 class MACDStrategy(IStrategy):
     strategy_id = "MACD"
     param_space = {
-        'fast': (8, 20, 'int'),
-        'slow': (20, 40, 'int'),
+        'fast': (5, 20, 'int'),
+        'slow': (20, 50, 'int'),
         'signal': (5, 15, 'int'),
     }
 

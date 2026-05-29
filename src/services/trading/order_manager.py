@@ -270,6 +270,14 @@ class OrderManager:
         else:
             vol = volume
 
+        # Calculate default SL/TP if not provided (Safety protection)
+        sl_pct = self.config.get("risk_management", "stop_loss_pct") / 100
+        tp_pct = self.config.get("risk_management", "take_profit_pct") / 100
+        if sl is None:
+            sl = default_sl(entry, "BUY" if signal == 1 else "SELL", sl_pct)
+        if tp is None:
+            tp = default_tp(entry, "BUY" if signal == 1 else "SELL", tp_pct)
+
         side = "BUY" if signal == 1 else "SELL"
         result = self.exchange.create_order(
             symbol=symbol, side=side, volume=vol,

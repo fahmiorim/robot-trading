@@ -20,13 +20,13 @@ HC_INFO = {
         "icon": "❌",
         "label": "Max Error Beruntun",
         "min": 3, "max": 100, "step": 1,
-        "help": "Jumlah error beruntun sebelum bot dianggap gagal.",
+        "help": "Jumlah error beruntun sebelum bot dianggap gagal. Scalping M1: 5 cukup — restart lebih cepat saat error beruntun.",
     },
     "max_idle_minutes": {
         "icon": "💤",
         "label": "Max Idle (menit)",
         "min": 5, "max": 240, "step": 5,
-        "help": "Waktu tanpa aktivitas sebelum bot dianggap stalled. Scalping: 10–15 menit.",
+        "help": "Waktu tanpa aktivitas sebelum bot dianggap stalled. Scalping M1: 5–10 menit — cycle tiap 1 menit, jika 5 cycle tanpa trade bot dicurigai stalled.",
     },
     "auto_restart": {
         "icon": "🔄",
@@ -51,15 +51,24 @@ NOTIF_INFO = {
         "label": "Chat ID",
         "help": "ID chat atau grup Telegram untuk notifikasi.",
     },
-    "notify_on_trade": {
-        "icon": "💹",
-        "label": "Notifikasi per Trade",
-        "help": "Kirim notifikasi setiap kali ada posisi dibuka/ditutup.",
-    },
     "notify_daily_report": {
         "icon": "📊",
         "label": "Laporan Harian",
         "help": "Kirim ringkasan performa trading setiap hari.",
+    },
+}
+
+
+TLCMD_INFO = {
+    "enabled": {
+        "icon": "📱",
+        "label": "Aktifkan Telegram CMD",
+        "help": "Izinkan perintah Telegram untuk kontrol bot — /status, /positions, /trade, dll.",
+    },
+    "allowed_chat_ids": {
+        "icon": "👤",
+        "label": "Chat ID Diizinkan",
+        "help": "Daftar chat ID yang diizinkan mengirim perintah Telegram. Pisahkan dengan koma. Contoh: 123456789, 987654321",
     },
 }
 
@@ -107,6 +116,37 @@ def _render_health(config) -> bool:
     return edited
 
 
+def _render_telegram_cmd(config) -> bool:
+    edited = False
+    st.markdown("### 📱 Telegram Commands")
+    st.caption("Izinkan perintah Telegram untuk kontrol bot jarak jauh — /status, /positions, /trade, /balance.")
+    edited |= _render_card(config, "telegram_cmd", "enabled", TLCMD_INFO["enabled"])
+    if config.get("telegram_cmd", "enabled"):
+        v = config.get("telegram_cmd", "allowed_chat_ids")
+        original_val = v  # preserve original (list) for restore
+        if isinstance(v, list):
+            display_val = ", ".join(str(c) for c in v)
+        else:
+            display_val = str(v) if v else ""
+        with st.container(border=True):
+            c1, c2 = st.columns([1.8, 1.2], vertical_alignment="center")
+            with c1:
+                st.markdown(f"**{TLCMD_INFO['allowed_chat_ids']['icon']} {TLCMD_INFO['allowed_chat_ids']['label']}**")
+                st.caption(TLCMD_INFO['allowed_chat_ids']['help'])
+            with c2:
+                nv = st.text_input(TLCMD_INFO['allowed_chat_ids']['label'], display_val,
+                                   key="telegram_cmd_allowed_chat_ids", label_visibility="collapsed")
+        if nv != display_val:
+            try:
+                chat_ids = [int(c.strip()) for c in nv.split(",") if c.strip()]
+                config.set("telegram_cmd", "allowed_chat_ids", chat_ids)
+                edited = True
+            except ValueError:
+                st.warning("⚠️ Chat ID harus berupa angka. Pisahkan dengan koma. Contoh: 123456789, 987654321")
+                config.set("telegram_cmd", "allowed_chat_ids", original_val)
+    return edited
+
+
 def _render_notifications(config) -> bool:
     st.markdown("### 🔔 Notifikasi")
     st.caption("Kirim notifikasi trading ke Telegram — pantau posisi dan performa real-time.")
@@ -118,11 +158,7 @@ def _render_notifications(config) -> bool:
             edited |= _render_card(config, "notifications", "telegram_bot_token", NOTIF_INFO["telegram_bot_token"])
         with cols[1]:
             edited |= _render_card(config, "notifications", "telegram_chat_id", NOTIF_INFO["telegram_chat_id"])
-        cols = st.columns(2)
-        with cols[0]:
-            edited |= _render_card(config, "notifications", "notify_on_trade", NOTIF_INFO["notify_on_trade"])
-        with cols[1]:
-            edited |= _render_card(config, "notifications", "notify_daily_report", NOTIF_INFO["notify_daily_report"])
+        edited |= _render_card(config, "notifications", "notify_daily_report", NOTIF_INFO["notify_daily_report"])
     return edited
 
 
@@ -142,5 +178,7 @@ def render(config) -> bool:
     edited |= _render_health(config)
     st.markdown("---")
     edited |= _render_notifications(config)
+    st.markdown("---")
+    edited |= _render_telegram_cmd(config)
 
     return edited

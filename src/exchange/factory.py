@@ -1,6 +1,6 @@
 """Exchange factory — creates the appropriate exchange backend from config.
 
-Extracted from TradingController._init_exchange() to keep controllers thin.
+Currently only MT5 is supported (bybit and ccxt backends have been removed).
 
 Usage:
     exchange = ExchangeFactory.from_config(config)
@@ -11,8 +11,6 @@ from typing import Optional
 from src.configuration.manager import ConfigManager
 from src.exchange.base import IExchange
 from src.exchange.mt5 import MT5Exchange
-from src.exchange.ccxt import CCXTExchange
-from src.exchange.bybit import BybitExchange
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,10 +23,7 @@ class ExchangeFactory:
     def from_config(config: ConfigManager, symbol: Optional[str] = None) -> IExchange:
         """Create and return the appropriate exchange backend.
 
-        Reads ``exchange.type`` from config:
-          - ``bybit`` → BybitExchange
-          - ``ccxt``  → CCXTExchange (generic)
-          - anything else → MT5Exchange (default)
+        Currently only returns a configured MT5Exchange instance.
 
         Args:
             config: Application config manager.
@@ -37,62 +32,10 @@ class ExchangeFactory:
         Returns:
             Configured exchange instance.
         """
-        exchange_type = config.get("exchange", "type").lower()
         sym = symbol or config.get("general", "symbol")
         magic = config.get("general", "magic_number")
         sl_pct = config.get("exchange", "default_sl_pct")
         tp_pct = config.get("exchange", "default_tp_pct")
 
-        if exchange_type == "bybit":
-            return ExchangeFactory._create_bybit(config, sym, magic, sl_pct, tp_pct)
-        elif exchange_type == "ccxt":
-            return ExchangeFactory._create_ccxt(config, sym, magic, sl_pct, tp_pct)
-        else:
-            return MT5Exchange(symbol=sym, magic_number=magic,
-                               default_sl_pct=sl_pct, default_tp_pct=tp_pct)
-
-    # ── Private constructors ──────────────────────────────────
-
-    @staticmethod
-    def _create_bybit(config: ConfigManager, symbol: str, magic: int,
-                      sl_pct: float, tp_pct: float) -> BybitExchange:
-        bybit_cfg = config.get("exchange", "bybit")
-        return BybitExchange(
-            symbol=symbol,
-            api_key=config.get("exchange", "api_key"),
-            secret=config.get("exchange", "secret"),
-            password=config.get("exchange", "password"),
-            sandbox=config.get("exchange", "sandbox"),
-            category=(
-                bybit_cfg.get("category", "linear")
-                if isinstance(bybit_cfg, dict) else "linear"
-            ),
-            position_mode=(
-                bybit_cfg.get("position_mode", "one-way")
-                if isinstance(bybit_cfg, dict) else "one-way"
-            ),
-            default_leverage=(
-                bybit_cfg.get("default_leverage", 5)
-                if isinstance(bybit_cfg, dict) else 5
-            ),
-            options=config.get("exchange", "options"),
-            magic_number=magic,
-            default_sl_pct=sl_pct,
-            default_tp_pct=tp_pct,
-        )
-
-    @staticmethod
-    def _create_ccxt(config: ConfigManager, symbol: str, magic: int,
-                     sl_pct: float, tp_pct: float) -> CCXTExchange:
-        return CCXTExchange(
-            exchange_name=config.get("exchange", "name"),
-            symbol=symbol,
-            api_key=config.get("exchange", "api_key"),
-            secret=config.get("exchange", "secret"),
-            password=config.get("exchange", "password"),
-            sandbox=config.get("exchange", "sandbox"),
-            options=config.get("exchange", "options"),
-            magic_number=magic,
-            default_sl_pct=sl_pct,
-            default_tp_pct=tp_pct,
-        )
+        return MT5Exchange(symbol=sym, magic_number=magic,
+                           default_sl_pct=sl_pct, default_tp_pct=tp_pct)

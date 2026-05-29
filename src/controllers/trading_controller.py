@@ -33,7 +33,6 @@ from src.services.notification_service import NotificationService
 from src.services.backtest_service import BacktestService
 from src.repositories.analytics_repo import AnalyticsRepository
 from src.repositories.trade_repo import TradeRepository
-from src.services.trading.pairlist import PairlistManager
 from src.services.trading.order_manager import OrderManager
 from src.services.trading.lock_manager import LockManager
 from src.models.trade import Trade, TradeManager
@@ -73,7 +72,6 @@ class TradingController:
         self.exchange = ExchangeFactory.from_config(self.config)
 
         # ── Core subsystems ──
-        self.pairlist = PairlistManager(self.config, self.exchange)
         self.data_provider = DataProvider(
             self.exchange, self.symbol, self.timeframe,
             default_count=self.config.get("general", "data_count"),
@@ -99,6 +97,10 @@ class TradingController:
             self.config, self.backtest_service.engine, self.analytics_repo,
         )
         self.strategies = self.strategy_service.strategies
+        self.best_strategy_name = self.strategy_service.best_strategy_name
+        self.best_strategy = self.strategy_service.best_strategy
+        self.disabled_strategies = self.strategy_service.disabled_strategies
+        self.current_regime = self.strategy_service.current_regime
         self.trade_execution_service = TradeExecutionService(
             self.config, self.exchange, self.order_manager,
             self.trade_manager, None,  # rpc set later
@@ -118,6 +120,9 @@ class TradingController:
         self._rpc_setup = RPCSetupService(self.config, self.rpc)
         self._rpc_setup.setup_all(self)
         self.trade_execution_service.rpc = self.rpc
+
+        # ── Register concept drift alert hook ──
+        self.ml_service.trainer.on("drift", self._on_concept_drift)
 
         # ── Cycle tracking ──
         # (State now managed by system_service)
@@ -151,8 +156,7 @@ class TradingController:
         return self.data_provider.fetch(count=count, force_refresh=force_refresh)
 
     def get_current_price(self) -> Dict[str, float]:
-        return self.exchange.fetch_ticker(self.symbol)        # ── Register drift alert hook ──
-        self.ml_service.trainer.on("drift", self._on_concept_drift)
+        return self.exchange.fetch_ticker(self.symbol)
 
         # ── Backtest & Strategy ──
 
@@ -249,14 +253,17 @@ class TradingController:
         self.system_service.mark_cycle_start()
         logger.info(f"{'='*40}\nCycle #{self.system_service.cycle_count}")
 
-        # Update Risk Balance before cycle starts
+        # Update Risk Balance and Open Positions before cycle starts
         try:
             if self.paper_trading:
                 self.risk_manager.update_balance(self.order_manager.paper_balance)
+                self.risk_manager.protection_ctx.open_positions = len(self.order_manager.paper_positions)
             else:
                 acc = self.exchange.get_balance()
                 if acc.get("balance"):
                     self.risk_manager.update_balance(acc["balance"])
+                positions = self.exchange.get_open_positions(self.symbol)
+                self.risk_manager.protection_ctx.open_positions = len(positions) if positions else 0
         except Exception as e:
             logger.error(f"Risk balance update failed: {e}")
 
@@ -422,8 +429,7 @@ class TradingController:
             "ml_trained": self.ml_service.is_trained,
             "ml_accuracy": self.ml_service.last_accuracy,
             "ml_concept_drifted": self.ml_service.trainer.concept_drifted,
-            "pairlist_pairs": self.pairlist.get_pairs(),
-            "pairlist_count": len(self.pairlist.get_pairs()),
+
         }
 
     # ── Cleanup ──

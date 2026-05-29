@@ -23,10 +23,17 @@ BT_INFO = {
         "min": 0.0, "max": 5.0, "step": 0.01,
         "help": "Selisih harga eksekusi. Scalping M1: 0.1% untuk simulasi realistis.",
     },
-    "position_sizing": {
-        "icon": "📐",
-        "label": "Metode Sizing",
-        "help": "fixed_pct = persentase tetap, kelly = fractional Kelly optimal.",
+    "risk_free_rate": {
+        "icon": "🏦",
+        "label": "Risk-Free Rate",
+        "min": 0.0, "max": 1.0, "step": 0.001, "format": "%.3f",
+        "help": "Tingkat return bebas risiko tahunan (fraction). 0.02 = 2%. Digunakan untuk Sharpe & Sortino ratio.",
+    },
+    "periods_per_year": {
+        "icon": "📅",
+        "label": "Periode per Tahun",
+        "min": 1, "max": 525600, "step": 1,
+        "help": "Jumlah periode trading per tahun. Daily: 252, H1: ~5840, M15: ~35040, M5: ~105120, M1: ~525600.",
     },
 }
 
@@ -34,6 +41,8 @@ BT_INFO = {
 def _render_card(config, section: str, key: str, info: dict) -> bool:
     edited = False
     v = config.get(section, key)
+    is_int = info.get("min") is not None and isinstance(info["min"], int)
+    fmt = info.get("format", None)
 
     with st.container(border=True):
         col1, col2 = st.columns([0.65, 0.35], vertical_alignment="center")
@@ -41,13 +50,12 @@ def _render_card(config, section: str, key: str, info: dict) -> bool:
             st.markdown(f"**{info['icon']} {info['label']}**")
             st.caption(info.get('help', ''))
         with col2:
-            if key == "position_sizing":
-                opts = ["fixed_pct", "kelly"]
-                idx = opts.index(v) if v in opts else 0
-                nv = st.selectbox(info["label"], opts, idx, key=f"{section}_{key}", label_visibility="collapsed")
+            if is_int:
+                nv = st.number_input(info["label"], info["min"], info["max"], int(v), int(info.get("step", 1)),
+                                     key=f"{section}_{key}", label_visibility="collapsed")
             else:
                 nv = st.number_input(info["label"], info["min"], info["max"], float(v), info.get("step", 0.1),
-                                     key=f"{section}_{key}", label_visibility="collapsed")
+                                     format=fmt, key=f"{section}_{key}", label_visibility="collapsed")
         if nv != v:
             config.set(section, key, nv)
             edited = True
@@ -76,9 +84,18 @@ def render(config) -> bool:
         with cols[i]:
             edited |= _render_card(config, "backtest", k, BT_INFO[k])
 
+    # ── Performance Metrics ──
     st.markdown("---")
-    st.markdown("### 📐 Position Sizing")
-    st.caption("Metode alokasi posisi: fixed_pct untuk konsistensi, kelly untuk optimal.")
-    edited |= _render_card(config, "backtest", "position_sizing", BT_INFO["position_sizing"])
+    st.markdown("### 📈 Metrik Performa")
+    st.caption(
+        "Risk-free rate dan periode per tahun untuk kalkulasi Sharpe & Sortino ratio. "
+        "Digunakan oleh backtesting engine untuk annualized ratio."
+    )
+
+    cols = st.columns(2)
+    with cols[0]:
+        edited |= _render_card(config, "performance", "risk_free_rate", BT_INFO["risk_free_rate"])
+    with cols[1]:
+        edited |= _render_card(config, "performance", "periods_per_year", BT_INFO["periods_per_year"])
 
     return edited

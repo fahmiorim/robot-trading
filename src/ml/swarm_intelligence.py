@@ -1,4 +1,5 @@
 import os
+
 import time
 import numpy as np
 import pandas as pd
@@ -23,19 +24,23 @@ class SwarmIntelligence:
             'gb_classifier': MLModel('gradient_boosting', config=self.config)
         }
         
-        # Try to load existing models from disk
+        # Try to load existing models from disk (only if not already trained)
         os.makedirs("trained_models", exist_ok=True)
         for name, model in self.models.items():
-            model.load(f"trained_models/swarm_{name}.pkl")
+            if not model.is_trained:
+                model.load(f"trained_models/swarm_{name}.pkl")
         
-        ma_fast = self.config.get("strategies", "ma_fast_period")
-        ma_slow = self.config.get("strategies", "ma_slow_period")
-        rsi_period = self.config.get("strategies", "rsi_period")
-        rsi_overbought = self.config.get("strategies", "rsi_overbought")
-        rsi_oversold = self.config.get("strategies", "rsi_oversold")
-        macd_fast = self.config.get("strategies", "macd_fast_period")
-        macd_slow = self.config.get("strategies", "macd_slow_period")
-        macd_signal = self.config.get("strategies", "macd_signal_period")
+        ma_cfg = self.config.get("strategies", "MA_Crossover")
+        ma_fast = ma_cfg.get("fast_period", 10)
+        ma_slow = ma_cfg.get("slow_period", 25)
+        rsi_cfg = self.config.get("strategies", "RSI")
+        rsi_period = rsi_cfg.get("period", 9)
+        rsi_overbought = rsi_cfg.get("overbought", 80)
+        rsi_oversold = rsi_cfg.get("oversold", 20)
+        macd_cfg = self.config.get("strategies", "MACD")
+        macd_fast = macd_cfg.get("fast", 12)
+        macd_slow = macd_cfg.get("slow", 26)
+        macd_signal = macd_cfg.get("signal", 9)
         self.strategies = {
             'ma': MACrossoverStrategy(fast_period=ma_fast, slow_period=ma_slow),
             'rsi': RSIStrategy(period=rsi_period, overbought=rsi_overbought, oversold=rsi_oversold),
@@ -85,14 +90,17 @@ class SwarmIntelligence:
         
         # Recreate strategies dynamically in case periods changed in the DB config
         try:
-            ma_fast = self.config.get("strategies", "ma_fast_period")
-            ma_slow = self.config.get("strategies", "ma_slow_period")
-            rsi_period = self.config.get("strategies", "rsi_period")
-            rsi_overbought = self.config.get("strategies", "rsi_overbought")
-            rsi_oversold = self.config.get("strategies", "rsi_oversold")
-            macd_fast = self.config.get("strategies", "macd_fast_period")
-            macd_slow = self.config.get("strategies", "macd_slow_period")
-            macd_signal = self.config.get("strategies", "macd_signal_period")
+            ma_cfg = self.config.get("strategies", "MA_Crossover")
+            ma_fast = ma_cfg.get("fast_period", 10)
+            ma_slow = ma_cfg.get("slow_period", 25)
+            rsi_cfg = self.config.get("strategies", "RSI")
+            rsi_period = rsi_cfg.get("period", 9)
+            rsi_overbought = rsi_cfg.get("overbought", 80)
+            rsi_oversold = rsi_cfg.get("oversold", 20)
+            macd_cfg = self.config.get("strategies", "MACD")
+            macd_fast = macd_cfg.get("fast", 12)
+            macd_slow = macd_cfg.get("slow", 26)
+            macd_signal = macd_cfg.get("signal", 9)
             
             self.strategies = {
                 'ma': MACrossoverStrategy(fast_period=ma_fast, slow_period=ma_slow),

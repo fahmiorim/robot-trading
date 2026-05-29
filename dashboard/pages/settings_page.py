@@ -7,9 +7,10 @@ from dashboard.pages.settings.strategies_tab import render as render_strategies
 from dashboard.pages.settings.risk_tab import render as render_risk
 from dashboard.pages.settings.health_tab import render as render_health
 from dashboard.pages.settings.ml_tab import render as render_ml
-from dashboard.pages.settings.signals_tab import render as render_signals
 from dashboard.pages.settings.trading_tab import render as render_trading
 from dashboard.pages.settings.backtest_tab import render as render_backtest
+from dashboard.pages.settings.agent_tab import render as render_agent
+from dashboard.pages.settings.rpc_tab import render as render_rpc
 
 
 def render():
@@ -22,12 +23,13 @@ def render():
     tab_labels = [
         "\U0001f4cb General",
         "\U0001f4c8 Strategies",
-        "\U0001f6e1\ufe0f Risk",
+        "\U0001f6e1\ufe0f Risk & Protection",
         "\U0001f3e5 Health",
         "\U0001f9e0 ML",
-        "\U0001f4e1 Signals",
-        "\U0001f4b9 Trading",
+        "\U0001f4b9 Trading, DCA & Order",
         "\U0001f4ca Backtest",
+        "\U0001f916 Signals & Agent",
+        "\U0001f4e1 RPC & API",
     ]
     tabs = st.tabs(tab_labels)
 
@@ -42,11 +44,13 @@ def render():
     with tabs[4]:
         edited |= render_ml(config)
     with tabs[5]:
-        edited |= render_signals(config)
-    with tabs[6]:
         edited |= render_trading(config)
-    with tabs[7]:
+    with tabs[6]:
         edited |= render_backtest(config)
+    with tabs[7]:
+        edited |= render_agent(config)
+    with tabs[8]:
+        edited |= render_rpc(config)
 
     # ── CONFIG WARNINGS ──────────────────────────────────────
     if config_warnings:
@@ -73,4 +77,3 @@ def render():
     with cs3:
         if edited:
             st.info("\u26a1 Changes detected \u2014 click Save Config")
-

@@ -1,10 +1,12 @@
 """Dashboard overview page — bot status, risk summary, strategy signals, MT5 status."""
 
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
+import urllib.parse
+import time
 
 from src.rpc.websocket import get_shared
+from src.constants.timeframes import TIMEFRAME_MAP
 from dashboard.components import render_auto_trade_controls
 from dashboard.helpers import ensure_mt5, get_available_symbols
 from dashboard.styles import _PREMIUM_CSS
@@ -54,6 +56,7 @@ def render():
                     <div><span style="opacity:0.55;">Cycles:</span> <strong id="rt-bot-cycles">—</strong></div>
                     <div><span style="opacity:0.55;">Regime:</span> <strong id="rt-bot-regime" style="font-weight:800; text-transform:uppercase;">—</strong></div>
                     <div><span style="opacity:0.55;">Best Strategy:</span> <strong id="rt-bot-best-strat">—</strong></div>
+                    <div style="grid-column: span 2;"><span style="opacity:0.55;">Auto Trading:</span> <strong id="rt-bot-status">—</strong></div>
                 </div>
             </div>
             
@@ -112,7 +115,8 @@ def render():
                             <th style="padding: 6px 10px;">Symbol</th>
                             <th style="padding: 6px 10px;">Type</th>
                             <th style="padding: 6px 10px;">Volume</th>
-                            <th style="padding: 6px 10px;">Price</th>
+                            <th style="padding: 6px 10px;">Entry</th>
+                            <th style="padding: 6px 10px;">Current</th>
                             <th style="padding: 6px 10px;">SL / TP</th>
                             <th style="padding: 6px 10px; text-align: right;">Profit ($)</th>
                             <th style="padding: 6px 10px; text-align: center;">Action</th>
@@ -120,7 +124,7 @@ def render():
                     </thead>
                     <tbody id="rt-positions-table-body">
                         <tr>
-                            <td colspan="8" style="padding: 24px; text-align: center; opacity: 0.5;">No active positions</td>
+                            <td colspan="9" style="padding: 24px; text-align: center; opacity: 0.5;">No active positions</td>
                         </tr>
                     </tbody>
                 </table>
@@ -189,6 +193,11 @@ def render():
                             }
                             
                             document.getElementById('rt-bot-best-strat').textContent = d.status.best_strategy || '—';
+                            
+                            const statusEl = document.getElementById('rt-bot-status');
+                            if (statusEl) {
+                                statusEl.innerHTML = d.status.auto_trading ? '<span style="color:#10b981; font-weight:800;">🔴 RUNNING</span>' : '<span style="color:#9ca3af; font-weight:800;">⚪ OFF</span>';
+                            }
                         }
                         
                         // Update Account Info
@@ -210,12 +219,12 @@ def render():
                         // Update Risk Snapshot
                         if (d.risk) {
                             const dd = Number(d.risk.drawdown_pct || 0);
-                            const maxDd = Number(d.risk.max_drawdown_pct || 5.0);
-                            document.getElementById('rt-risk-dd').textContent = dd.toFixed(2) + '% (Limit: ' + maxDd + '%)';
+                            const maxDd = Number(d.risk.max_drawdown_limit_pct || 5.0);
+                            document.getElementById('rt-risk-dd').textContent = dd.toFixed(2) + '% (Limit: ' + maxDd.toFixed(2) + '%)';
                             
                             const dl = Number(d.risk.daily_loss_pct || 0);
-                            const maxDl = Number(d.risk.max_daily_loss_pct || 3.0);
-                            document.getElementById('rt-risk-daily-loss').textContent = dl.toFixed(2) + '% (Limit: ' + maxDl + '%)';
+                            const maxDl = Number(d.risk.max_daily_loss_limit_pct || 3.0);
+                            document.getElementById('rt-risk-daily-loss').textContent = dl.toFixed(2) + '% (Limit: ' + maxDl.toFixed(2) + '%)';
                             
                             document.getElementById('rt-risk-trades').textContent = d.risk.daily_trades || '0';
                             document.getElementById('rt-risk-positions').textContent = d.risk.open_positions || '0';
@@ -264,7 +273,7 @@ def render():
                             const tbody = document.getElementById('rt-positions-table-body');
                             const plist = d.positions.list || [];
                             if (plist.length === 0) {
-                                tbody.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; opacity: 0.5;">No active positions</td></tr>';
+                                tbody.innerHTML = '<tr><td colspan="9" style="padding: 16px; text-align: center; opacity: 0.5;">No active positions</td></tr>';
                             } else {
                                 let html = '';
                                 plist.forEach(function(p){
@@ -279,6 +288,7 @@ def render():
                                     html += `<td style="padding: 4px 10px;">${typeText}</td>`;
                                     html += `<td style="padding: 4px 10px; font-weight:600;">${Number(p.volume).toFixed(2)}</td>`;
                                     html += `<td style="padding: 4px 10px;">$${Number(p.price).toFixed(2)}</td>`;
+                                    html += `<td style="padding: 4px 10px; font-weight:600; color:#38bdf8;">$${Number(p.current_price || 0).toFixed(2)}</td>`;
                                     html += `<td style="padding: 4px 10px; font-size:0.7rem; opacity:0.6;">SL: ${p.sl ? Number(p.sl).toFixed(2) : '—'} | TP: ${p.tp ? Number(p.tp).toFixed(2) : '—'}</td>`;
                                     html += `<td style="padding: 4px 10px; text-align:right; font-weight:800; color:${profitColor};">${profitSign}$${profit.toFixed(2)}</td>`;
                                     html += `<td style="padding: 4px 10px; text-align:center;"><button onclick="closePosition(${p.ticket})" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); color:#f87171; border-radius:6px; padding:2px 8px; font-size:0.68rem; cursor:pointer; font-weight:600; font-family:'Outfit',sans-serif; transition:all 0.2s;">CLOSE</button></td>`;
@@ -319,7 +329,9 @@ def render():
     # Clean up empty lines from HTML
     realtime_panel_html_clean = "\n".join([line for line in realtime_panel_html.split("\n") if line.strip() != ""])
 
-    components.html(realtime_panel_html_clean, height=500, scrolling=False)
+    # Encode HTML as data URI for st.iframe (replaces deprecated st.components.v1.html)
+    data_uri = "data:text/html;charset=utf-8," + urllib.parse.quote(realtime_panel_html_clean)
+    st.iframe(data_uri, height=500)
 
     # ── Trading & Execution Controls ──
     st.subheader("💱 Trading & Execution")
@@ -328,7 +340,196 @@ def render():
     with col1:
         with st.container(border=True):
             st.markdown("<h4 style='margin:0 0 8px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>🤖 Auto Trading Controls</h4>", unsafe_allow_html=True)
-            render_auto_trade_controls()
+            
+            # Real-time Auto Trading Controls iframe
+            tf = config.get("general", "timeframe")
+            ci = TIMEFRAME_MAP.get(tf, 15)
+            
+            is_running = config.get("general", "auto_trade")
+            status_text = "🔴 RUNNING" if is_running else "⚪ OFF"
+            status_color = "#f87171" if is_running else "#9ca3af"
+            cycles = robot.system_service.cycle_count
+            
+            last_cycle = robot.system_service.last_cycle_time
+            sec_ago = int(time.time() - last_cycle)
+            if not is_running:
+                last_cycle_str = "—"
+            elif sec_ago < 60:
+                last_cycle_str = f"{sec_ago}s ago"
+            elif sec_ago < 3600:
+                last_cycle_str = f"{sec_ago // 60}m ago"
+            else:
+                last_cycle_str = f"{sec_ago // 3600}h ago"
+                
+            caption_display = "block" if is_running else "none"
+            
+            if is_running:
+                btn_text = "⏹ STOP AUTO TRADING"
+                btn_bg = "rgba(239, 68, 68, 0.15)"
+                btn_border = "1px solid rgba(239, 68, 68, 0.35)"
+                btn_text_color = "#f87171"
+            else:
+                btn_text = "▶️ START AUTO TRADING"
+                btn_bg = "linear-gradient(135deg, #6366f1, #8b5cf6)"
+                btn_border = "none"
+                btn_text_color = "#ffffff"
+                
+            controls_html = f"""
+            {_PREMIUM_CSS}
+            <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+            <div id="rt-controls-root" style="font-family: 'Outfit', sans-serif; display: flex; flex-direction: column; gap: 8px; padding: 0; background: transparent; overflow: hidden; margin: 0; box-sizing: border-box; height: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 8px; margin-top: 4px;">
+                    <div style="flex: 1; text-align: center;">
+                        <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">STATUS</div>
+                        <div id="rt-ctrl-status" style="font-size: 0.85rem; font-weight: 800; color: {status_color};">{status_text}</div>
+                    </div>
+                    <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                    <div style="flex: 1; text-align: center;">
+                        <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">CYCLES</div>
+                        <div id="rt-ctrl-cycles" style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">{cycles}</div>
+                    </div>
+                    <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                    <div style="flex: 1; text-align: center;">
+                        <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">LAST CYCLE</div>
+                        <div id="rt-ctrl-last-cycle" style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">{last_cycle_str}</div>
+                    </div>
+                    <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                    <div style="flex: 1; text-align: center;">
+                        <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">INTERVAL</div>
+                        <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc;">{ci} min</div>
+                    </div>
+                </div>
+                
+                <div id="rt-ctrl-caption" style="font-size: 0.72rem; opacity: 0.5; margin-bottom: 8px; font-weight: 500; display: {caption_display}; color: #ffffff; text-align: center;">
+                    Auto trading active — do not close this page!
+                </div>
+
+                <button id="rt-ctrl-btn" style="width: 100%; border: none; padding: 12px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: {btn_text_color}; background: {btn_bg}; border: {btn_border};">
+                    {btn_text}
+                </button>
+            </div>
+            
+            <script>
+            (function(){{
+                const wsPort = {ws_port};
+                let ws = null;
+                let reconnectTimer = null;
+                let isRunning = {str(is_running).lower()};
+                let lastCycleTimestamp = {last_cycle};
+                
+                setInterval(() => {{
+                    if (isRunning && lastCycleTimestamp) {{
+                        const secAgo = Math.floor(Date.now() / 1000 - lastCycleTimestamp);
+                        let str = "";
+                        if (secAgo < 60) {{
+                            str = secAgo + "s ago";
+                        }} else if (secAgo < 3600) {{
+                            str = Math.floor(secAgo / 60) + "m ago";
+                        }} else {{
+                            str = Math.floor(secAgo / 3600) + "h ago";
+                        }}
+                        document.getElementById('rt-ctrl-last-cycle').textContent = str;
+                    }} else if (!isRunning) {{
+                        document.getElementById('rt-ctrl-last-cycle').textContent = '—';
+                    }}
+                }}, 1000);
+
+                const btn = document.getElementById('rt-ctrl-btn');
+                btn.onclick = function() {{
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {{
+                        alert("WebSocket is not connected!");
+                        return;
+                    }}
+                    btn.disabled = true;
+                    btn.style.opacity = "0.6";
+                    if (isRunning) {{
+                        ws.send(JSON.stringify({{action: "stop_auto_trade"}}));
+                    }} else {{
+                        ws.send(JSON.stringify({{action: "start_auto_trade"}}));
+                    }}
+                }};
+                
+                function connect() {{
+                    try {{
+                        let host = window.location.hostname;
+                        if (!host || host === "null" || host === "") {{
+                            try {{
+                                if (window.parent && window.parent.location && window.parent.location.hostname) {{
+                                    host = window.parent.location.hostname;
+                                }}
+                            }} catch(e) {{
+                                if (document.referrer) {{
+                                    try {{
+                                        host = new URL(document.referrer).hostname;
+                                    }} catch(_) {{}}
+                                }}
+                            }}
+                        }}
+                        if (!host) {{
+                            host = "localhost";
+                        }}
+                        ws = new WebSocket('ws://' + host + ':' + wsPort);
+                        ws.onmessage = function(e){{
+                            try {{
+                                const d = JSON.parse(e.data);
+                                
+                                if (d.type === "action_result") {{
+                                    btn.disabled = false;
+                                    btn.style.opacity = "1";
+                                    if (!d.success) {{
+                                        alert(d.message);
+                                    }}
+                                    return;
+                                }}
+                                
+                                if (d.status) {{
+                                    isRunning = !!d.status.auto_trading;
+                                    document.getElementById('rt-ctrl-status').innerHTML = isRunning ? '🔴 RUNNING' : '⚪ OFF';
+                                    document.getElementById('rt-ctrl-status').style.color = isRunning ? '#f87171' : '#9ca3af';
+                                    document.getElementById('rt-ctrl-cycles').textContent = d.status.cycles || '0';
+                                    
+                                    if (isRunning) {{
+                                        btn.innerHTML = '⏹ STOP AUTO TRADING';
+                                        btn.style.background = 'rgba(239, 68, 68, 0.15)';
+                                        btn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                                        btn.style.color = '#f87171';
+                                        document.getElementById('rt-ctrl-caption').style.display = 'block';
+                                    }} else {{
+                                        btn.innerHTML = '▶️ START AUTO TRADING';
+                                        btn.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+                                        btn.style.border = 'none';
+                                        btn.style.color = '#ffffff';
+                                        document.getElementById('rt-ctrl-caption').style.display = 'none';
+                                    }}
+                                    btn.disabled = false;
+                                    btn.style.opacity = "1";
+                                    
+                                    if (d.status.last_cycle_time) {{
+                                        lastCycleTimestamp = Number(d.status.last_cycle_time);
+                                    }}
+                                }}
+                            }} catch(err){{
+                                console.error("Error processing websocket message:", err);
+                            }}
+                        }};
+                        ws.onclose = function(){{
+                            reconnectTimer = setTimeout(connect, 2000);
+                        }};
+                    }} catch(err){{
+                        console.error("Error establishing connection:", err);
+                        reconnectTimer = setTimeout(connect, 3000);
+                    }}
+                }}
+                
+                if(typeof WebSocket !== 'undefined') connect();
+            }})();
+            </script>
+            """
+            
+            # Clean up empty lines from HTML
+            controls_html_clean = "\n".join([line for line in controls_html.split("\n") if line.strip() != ""])
+            controls_data_uri = "data:text/html;charset=utf-8," + urllib.parse.quote(controls_html_clean)
+            st.iframe(controls_data_uri, height=190)
             
     with col2:
         with st.container(border=True):
