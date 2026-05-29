@@ -1,4 +1,4 @@
-"""Performance Analytics page — actual trade history, backtesting, advanced stats, hyperopt."""
+﻿"""Performance Analytics page — actual trade history, backtesting, advanced stats, hyperopt."""
 
 import streamlit as st
 import pandas as pd
@@ -33,7 +33,7 @@ def render():
                 history = dc.get_trade_history(limit=500)
                 if history:
                     df = pd.DataFrame(history)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width='stretch', hide_index=True)
                     render_trade_metrics(df, profit_col="profit")
 
                     summary = dc.get_trade_summary(days)
@@ -56,7 +56,7 @@ def render():
                     if history_raw is not None and len(history_raw) > 0:
                         # history_raw is List[Dict] — konversi ke DataFrame
                         history = pd.DataFrame(history_raw) if isinstance(history_raw, list) else history_raw
-                        st.dataframe(history, use_container_width=True)
+                        st.dataframe(history, width='stretch')
                         profit_col = next((c for c in ['profit', 'Profit', 'pnl', 'P&L'] if c in history.columns), None)
                         if profit_col:
                             render_trade_metrics(history, profit_col=profit_col)
@@ -74,7 +74,7 @@ def render():
         st.markdown("### ▶️ Historical Backtester")
         bt1, bt2 = st.columns([1, 3])
         with bt1:
-            if st.button("▶️ Run Full Backtest", use_container_width=True, type="primary"):
+            if st.button("▶️ Run Full Backtest", width='stretch', type="primary"):
                 with st.spinner("Running backtest..."):
                     try:
                         data = st.session_state.get("_last_data")
@@ -88,7 +88,7 @@ def render():
                     except Exception as e:
                         st.error(f"Backtest error: {e}")
         with bt2:
-            if st.button("📥 Fetch & Backtest", use_container_width=True):
+            if st.button("📥 Fetch & Backtest", width='stretch'):
                 with st.spinner("Fetching & backtesting..."):
                     try:
                         if not ensure_mt5():
@@ -133,7 +133,7 @@ def render():
                     "Calmar": f"{r.get('calmar_ratio', 0):.2f}",
                     "Profit Factor": f"{r.get('profit_factor', 1):.2f}",
                 })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
             st.subheader("📈 Equity Curves")
             fig = go.Figure()
@@ -142,17 +142,17 @@ def render():
                 if eq:
                     fig.add_trace(go.Scatter(y=eq, name=name, mode='lines', line=dict(width=1.5)))
             fig.update_layout(height=400, xaxis_title="Step", yaxis_title="Equity ($)", hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             st.subheader(f"📝 Trades: {best_name}")
             trades = best.get('trades', [])
             if trades:
                 tdf = pd.DataFrame(trades)
-                st.dataframe(tdf, use_container_width=True, hide_index=True)
+                st.dataframe(tdf, width='stretch', hide_index=True)
                 if 'profit_pct' in tdf.columns:
                     fig2 = px.histogram(tdf, x='profit_pct', nbins=30, title="P&L Distribution",
                                         labels={'profit_pct': 'Profit %'})
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width='stretch')
             else:
                 st.info("No trades recorded")
 
@@ -245,7 +245,7 @@ def render():
                     hovermode='x unified',
                     template='plotly_dark',
                 )
-                st.plotly_chart(fig_m, use_container_width=True)
+                st.plotly_chart(fig_m, width='stretch')
             else:
                 st.info("Monthly data not available (no datetime index or no trades)")
 
@@ -278,7 +278,7 @@ def render():
                 template='plotly_dark',
                 margin=dict(l=60, r=30, t=10, b=30),
             )
-            st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(fig_radar, width='stretch')
 
     # ── TAB 4: PARAMETER OPTIMIZER ──
     with tabs[3]:
@@ -314,7 +314,7 @@ def render():
             with ho3:
                 st.markdown("<br>", unsafe_allow_html=True)
                 disabled = st.session_state.hyperopt_running
-                if st.button("🧬 RUN HYPEROPT", use_container_width=True, type="primary", disabled=disabled):
+                if st.button("🧬 RUN HYPEROPT", width='stretch', type="primary", disabled=disabled):
                     st.session_state.hyperopt_running = True
                     st.rerun()
 
@@ -414,7 +414,7 @@ def render():
                             st.rerun()
 
                 st.markdown("---")
-                if st.button("📥 Apply ALL Best Params to Config", use_container_width=True, type="primary"):
+                if st.button("📥 Apply ALL Best Params to Config", width='stretch', type="primary"):
                     for sid, hresult in ho_results.items():
                         for k, v in hresult['params'].items():
                             config.set('strategies', sid, k, v)

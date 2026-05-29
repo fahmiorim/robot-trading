@@ -1,4 +1,4 @@
-"""Dashboard overview page — bot status, risk summary, strategy signals, MT5 status."""
+﻿"""Dashboard overview page — bot status, risk summary, strategy signals, MT5 status."""
 
 import streamlit as st
 import pandas as pd
@@ -316,7 +316,7 @@ def render():
             
             mb1, mb2 = st.columns(2)
             with mb1:
-                if st.button("BUY", type="primary", use_container_width=True):
+                if st.button("BUY", type="primary", width='stretch'):
                     try:
                         result = robot.open_trade(manual_symbol, "buy", manual_volume)
                         if result.get("success"):
@@ -327,7 +327,7 @@ def render():
                     except Exception as e:
                         st.error(f"Error: {e}")
             with mb2:
-                if st.button("SELL", type="secondary", use_container_width=True):
+                if st.button("SELL", type="secondary", width='stretch'):
                     try:
                         result = robot.open_trade(manual_symbol, "sell", manual_volume)
                         if result.get("success"):
@@ -347,7 +347,7 @@ def render():
                 trades = dc.get_trade_history(limit=10)
                 if trades:
                     df = pd.DataFrame(trades)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width='stretch', hide_index=True)
                 else:
                     st.info("No recent trades in database")
             except Exception as e:

@@ -1,4 +1,4 @@
-"""Database setup wizard — shown on first run when DB is not available.
+﻿"""Database setup wizard — shown on first run when DB is not available.
 
 Flow:
   1. User enters DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
@@ -260,7 +260,7 @@ def _render_step_credentials():
                             help="This database will be created if it doesn't exist")
 
     # ── Test Connection ──
-    if st.button("🔌 Test Connection", use_container_width=True):
+    if st.button("🔌 Test Connection", width='stretch'):
         success, msg = _test_connection(host, port, user, password)
         if success:
             st.success(msg)
@@ -280,7 +280,7 @@ def _render_step_credentials():
         if existing:
             st.warning(f"⚠️ Database **`{db_name}`** already exists. "
                        "Existing data will be preserved.")
-        if st.button("🚀 Initialize Database →", use_container_width=True, type="primary"):
+        if st.button("🚀 Initialize Database →", width='stretch', type="primary"):
             # Store credentials before moving to step 2
             st.session_state["_db_host"] = host
             st.session_state["_db_port"] = port
@@ -414,7 +414,7 @@ def _render_step_complete():
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("🚀 Launch Dashboard", use_container_width=True, type="primary"):
+    if st.button("🚀 Launch Dashboard", width='stretch', type="primary"):
         # Clean up wizard state
         for key in list(st.session_state.keys()):
             if key.startswith("wiz_") or key.startswith("_db_") or key.startswith("setup_"):

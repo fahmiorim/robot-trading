@@ -1,4 +1,4 @@
-"""Charts & Market Analysis page — price chart, market analysis, signals."""
+﻿"""Charts & Market Analysis page — price chart, market analysis, signals."""
 
 import time
 import streamlit as st
@@ -62,7 +62,7 @@ def render():
                 config.set("general", "data_count", data_count)
                 config.save()
         with cc[3]:
-            fetch_now = st.button("Refresh Data", use_container_width=True, type="primary")
+            fetch_now = st.button("Refresh Data", width='stretch', type="primary")
             if fetch_now:
                 with st.spinner("Fetching..."):
                     try:
@@ -140,7 +140,7 @@ def render():
                               dragmode="zoom",
                               paper_bgcolor="rgba(0,0,0,0)",
                               plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             # Clean HTML/CSS metrics bar
             last_close = chart_data["close"].iloc[-1]

@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 
 
 def render(config) -> bool:
@@ -26,7 +26,7 @@ def render(config) -> bool:
                 edited = True
 
     st.markdown("---")
-    if st.button("🧠 Retrain ML Now", use_container_width=True):
+    if st.button("🧠 Retrain ML Now", width='stretch'):
         data = st.session_state.get("_last_data")
         if data is not None:
             with st.spinner("Training..."):

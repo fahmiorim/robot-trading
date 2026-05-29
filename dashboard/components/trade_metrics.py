@@ -1,4 +1,4 @@
-"""Reusable component: Trade metrics (Total P&L, Win Rate, Avg Trade) + P&L chart."""
+﻿"""Reusable component: Trade metrics (Total P&L, Win Rate, Avg Trade) + P&L chart."""
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -39,4 +39,4 @@ def render_trade_metrics(df: pd.DataFrame, profit_col: str = "profit"):
             marker_color=df[profit_col].apply(lambda x: '#00b894' if x > 0 else '#ff6b6b'),
         ))
         fig.update_layout(height=350, xaxis_title="Trade #", yaxis_title="P&L ($)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')

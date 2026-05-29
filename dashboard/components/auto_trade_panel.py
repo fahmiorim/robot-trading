@@ -1,4 +1,4 @@
-"""Reusable component: Auto Trading start / stop controls."""
+﻿"""Reusable component: Auto Trading start / stop controls."""
 
 import time
 
@@ -41,7 +41,7 @@ def _render_compact(config):
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("⏹ STOP Auto Trading", use_container_width=True, type="primary"):
+        if st.button("⏹ STOP Auto Trading", width='stretch', type="primary"):
             st.session_state.worker.stop()
             config.set("general", "auto_trade", False)
             config.save()
@@ -128,7 +128,7 @@ def _render_full(config):
 
     # Start/Stop Button
     if not is_running:
-        if st.button("▶️ START AUTO TRADING", type="primary", use_container_width=True):
+        if st.button("▶️ START AUTO TRADING", type="primary", width='stretch'):
             if ensure_mt5():
                 st.session_state.worker.start()
                 st.session_state.config.set("general", "auto_trade", True)
@@ -141,7 +141,7 @@ def _render_full(config):
             else:
                 st.error("MT5 not connected!")
     else:
-        if st.button("⏹ STOP AUTO TRADING", type="primary", use_container_width=True):
+        if st.button("⏹ STOP AUTO TRADING", type="primary", width='stretch'):
             st.session_state.worker.stop()
             st.session_state.config.set("general", "auto_trade", False)
             st.session_state.config.save()

@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 
 from dashboard.helpers import refresh_robot
 
@@ -58,14 +58,14 @@ def render():
     st.markdown("---")
     cs1, cs2, cs3 = st.columns([1, 1, 3])
     with cs1:
-        if st.button("\U0001f4be Save Config", use_container_width=True, type="primary"):
+        if st.button("\U0001f4be Save Config", width='stretch', type="primary"):
             if config.save():
                 refresh_robot(config)
                 st.success("Saved & robot reloaded!")
             else:
                 st.error("Save failed!")
     with cs2:
-        if st.button("\U0001f504 Reset Defaults", use_container_width=True):
+        if st.button("\U0001f504 Reset Defaults", width='stretch'):
             config.reset_to_defaults()
             config.save()
             refresh_robot(config)
