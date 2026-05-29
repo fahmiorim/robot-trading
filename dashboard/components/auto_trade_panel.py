@@ -44,8 +44,7 @@ def _render_compact(config):
         """), unsafe_allow_html=True)
         if st.button("⏹ STOP Auto Trading", width='stretch', type="primary"):
             st.session_state.worker.stop()
-            config.set("general", "auto_trade", False)
-            config.save()
+            config.set_global("general", "auto_trade", False)
             st.session_state.auto_trading_enabled = False
             set_shared("auto_trading", False)
             st.session_state.last_auto_cycle_time = time.time()
@@ -63,8 +62,7 @@ def _render_compact(config):
         auto_trade = config.get("general", "auto_trade")
         auto_trade_new = st.toggle("Enable Auto Trade", value=auto_trade)
         if auto_trade_new != auto_trade:
-            config.set("general", "auto_trade", auto_trade_new)
-            config.save()
+            config.set_global("general", "auto_trade", auto_trade_new)
             if auto_trade_new:
                 st.session_state.worker.start()
                 st.session_state.auto_trading_enabled = True
@@ -132,8 +130,7 @@ def _render_full(config):
         if st.button("▶️ START AUTO TRADING", type="primary", width='stretch'):
             if ensure_mt5():
                 st.session_state.worker.start()
-                st.session_state.config.set("general", "auto_trade", True)
-                st.session_state.config.save()
+                st.session_state.config.set_global("general", "auto_trade", True)
                 st.session_state.auto_trading_enabled = True
                 set_shared("auto_trading", True)
                 st.session_state.last_auto_cycle_time = time.time()
@@ -144,8 +141,7 @@ def _render_full(config):
     else:
         if st.button("⏹ STOP AUTO TRADING", type="primary", width='stretch'):
             st.session_state.worker.stop()
-            st.session_state.config.set("general", "auto_trade", False)
-            st.session_state.config.save()
+            st.session_state.config.set_global("general", "auto_trade", False)
             st.session_state.auto_trading_enabled = False
             set_shared("auto_trading", False)
             st.session_state.last_auto_cycle_time = time.time()

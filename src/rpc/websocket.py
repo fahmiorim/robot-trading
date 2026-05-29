@@ -93,7 +93,13 @@ class WebSocketRPC(IRPC):
             except Exception:
                 pass
         if self._loop and self._loop.is_running():
-            self._loop.call_soon_threadsafe(self._loop.stop)
+            try:
+                def _cancel_all():
+                    for task in asyncio.all_tasks(self._loop):
+                        task.cancel()
+                self._loop.call_soon_threadsafe(_cancel_all)
+            except Exception:
+                pass
 
     def broadcast(self, data: Dict[str, Any]) -> None:
         """Thread-safe: push data to all connected clients."""
@@ -109,10 +115,24 @@ class WebSocketRPC(IRPC):
         asyncio.set_event_loop(self._loop)
         try:
             self._loop.run_until_complete(self._serve())
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             logger.error(f"WS loop error: {e}")
         finally:
-            self._loop.close()
+            try:
+                # Cancel any remaining tasks
+                pending = asyncio.all_tasks(self._loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            try:
+                self._loop.close()
+            except Exception:
+                pass
             self._loop = None
 
 
@@ -168,8 +188,7 @@ class WebSocketRPC(IRPC):
                     elif action == "start_auto_trade" and getattr(self, "bot", None):
                         logger.info("WS client requested start auto trading")
                         if self.bot.exchange.connect() and self.bot.exchange.is_connected():
-                            self.bot.config.set("general", "auto_trade", True)
-                            self.bot.config.save()
+                            self.bot.config.set_global("general", "auto_trade", True)
                             set_shared("auto_trading", True)
                             worker = getattr(self.bot, "worker", None)
                             if worker:
@@ -192,8 +211,7 @@ class WebSocketRPC(IRPC):
                             }))
                     elif action == "stop_auto_trade" and getattr(self, "bot", None):
                         logger.info("WS client requested stop auto trading")
-                        self.bot.config.set("general", "auto_trade", False)
-                        self.bot.config.save()
+                        self.bot.config.set_global("general", "auto_trade", False)
                         set_shared("auto_trading", False)
                         worker = getattr(self.bot, "worker", None)
                         if worker:
@@ -208,6 +226,24 @@ class WebSocketRPC(IRPC):
                             "success": True,
                             "message": "Auto Trading stopped!"
                         }))
+                    elif action == "open_trade" and getattr(self, "bot", None):
+                        sym = payload.get("symbol")
+                        side = payload.get("side")
+                        vol = float(payload.get("volume", 0.1))
+                        logger.info(f"WS client requested open trade: {side} {vol} {sym}")
+                        result = self.bot.open_trade(sym, side, vol)
+                        if result.get("success"):
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": True,
+                                "message": f"Successfully executed {side.upper()} order!"
+                            }))
+                        else:
+                            await ws.send(json.dumps({
+                                "type": "action_result",
+                                "success": False,
+                                "message": f"Failed to execute order: {result.get('error', 'Unknown error')}"
+                            }))
                 except Exception as e:
                     logger.error(f"WS message handling error: {e}")
         except websockets.exceptions.ConnectionClosed:
@@ -366,6 +402,7 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                         "ask": ticker.get("ask"),
                         "spread": round(ticker.get("ask", 0) - ticker.get("bid", 0), 2)
                         if ticker.get("ask") and ticker.get("bid") else None,
+                        "time": ticker.get("time"),
                     },
                     "account": {
                         "balance": account_balance,

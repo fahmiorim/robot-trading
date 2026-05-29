@@ -127,7 +127,7 @@ class DatabaseManager(
             try:
                 self._connection = mysql.connector.connect(**_load_db_config())
                 self._connection.autocommit = False
-                logger.info("MySQL connection established")
+                logger.debug("MySQL connection established")
                 self._reconnect_delay = 1.0
                 self._ensure_required_tables()
                 return self._connection

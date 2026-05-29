@@ -501,6 +501,7 @@ class MT5Exchange(IExchange):
                 'point': float(getattr(info, 'point', 0.01)),
                 'trade_stops_level': int(getattr(info, 'trade_stops_level', 0)),
                 'contract_size': float(getattr(info, 'trade_contract_size', 100.0)),
+                'description': str(getattr(info, 'description', '')),
             }
         except Exception as e:
             logger.error(f"Error getting symbol info: {e}")

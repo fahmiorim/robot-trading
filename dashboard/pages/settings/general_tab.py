@@ -28,7 +28,7 @@ def render(config) -> bool:
             prev_tf = config.get("general", "timeframe")
             
             # Update symbol and switch context to new symbol
-            config.set("general", "symbol", sym)
+            config.set_global("general", "symbol", sym)
             config.set_context(sym, prev_tf)
             edited = True
 
@@ -87,9 +87,9 @@ def render(config) -> bool:
             help="Cycle interval auto-syncs to timeframe. Kelompok: ⚡ Scalping, 📊 Day Trading, 📈 Swing Trading, 🎯 Position Trading."
         )
         if tf != current_tf:
-            config.set("general", "timeframe", tf)
+            config.set_global("general", "timeframe", tf)
             tf_minutes = TIMEFRAME_MINUTES.get(tf, 15)
-            config.set("general", "cycle_interval_minutes", tf_minutes)
+            config.set_global("general", "cycle_interval_minutes", tf_minutes)
             config.set_context(config.get("general", "symbol"), tf)
             edited = True
 
@@ -109,12 +109,12 @@ def render(config) -> bool:
     with col1:
         dc = st.number_input("Data Count", 100, 100000, config.get("general", "data_count"), 1000)
         if dc != config.get("general", "data_count"):
-            config.set("general", "data_count", dc)
+            config.set_global("general", "data_count", dc)
             edited = True
     with col2:
         mn = st.number_input("Magic Number", 1, 999999, config.get("general", "magic_number"))
         if mn != config.get("general", "magic_number"):
-            config.set("general", "magic_number", mn)
+            config.set_global("general", "magic_number", mn)
             edited = True
 
     return edited

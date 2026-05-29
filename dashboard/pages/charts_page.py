@@ -2,14 +2,31 @@
 
 import time
 import textwrap
+import os
+import json
+import urllib.parse
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
+
+# Gentle auto-refresh (15 seconds) to update indicators and recommendations
+st_autorefresh(interval=15000, limit=None, key="chart_autorefresh")
 
 from dashboard.helpers import ensure_mt5, refresh_robot, map_sig, get_available_symbols
 
 from src.configuration import TIMEFRAME_MAP
-from src.rpc.websocket import set_shared
+from src.rpc.websocket import set_shared, get_shared
+
+def format_mt5_price(price: float, digits: int = 2) -> tuple:
+    """Format a price MT5-style: split into a small part and the last two large digits."""
+    if not price or price <= 0:
+        return "0.", "00"
+    price_str = f"{price:.{digits}f}"
+    if len(price_str) >= 2:
+        return price_str[:-2], price_str[-2:]
+    return price_str, ""
+
 
 
 def render():
@@ -17,23 +34,49 @@ def render():
     config = st.session_state.config
     robot = st.session_state.robot
 
-    # ── Auto-fetch: load data automatically if none cached or stale ──
-    data = st.session_state.get("_last_data")
-    now = time.time()
-    data_age = now - st.session_state.get("_last_fetch_time", 0) if data is not None else 9999
-    should_auto_fetch = data is None or data_age > 120  # 2 min stale
+    # ── Quick Trade Execution via Query Parameters ──
+    query_params = st.query_params
+    if "trade_action" in query_params:
+        action = query_params["trade_action"]
+        volume_str = query_params.get("trade_volume", "0.1")
+        try:
+            volume = float(volume_str)
+        except ValueError:
+            volume = 0.10
 
-    last_attempt = st.session_state.get("_last_auto_fetch_attempt", 0)
-    if should_auto_fetch and (now - last_attempt) > 60:
-        if ensure_mt5():
-            try:
-                with st.spinner("Loading market data..."):
-                    data = robot.fetch_data()
-                    st.session_state["_last_data"] = data
-                    st.session_state["_last_fetch_time"] = now
-            except Exception as e:
-                st.caption(f"Auto-fetch unavailable: {e}")
-        st.session_state["_last_auto_fetch_attempt"] = now
+        st.session_state["mt5_lot_value"] = volume
+
+        if "trade_action" in st.query_params:
+            del st.query_params["trade_action"]
+        if "trade_volume" in st.query_params:
+            del st.query_params["trade_volume"]
+
+        if not ensure_mt5():
+            st.error("MT5 terminal not connected. Cannot execute trade.")
+        else:
+            with st.spinner(f"Executing {action.upper()} trade of {volume:.2f} lots..."):
+                try:
+                    sig = 1 if action.lower() == "buy" else -1
+                    res = robot.execute_trade(sig, volume=volume)
+                    if res.get("success"):
+                        st.success(f"Successfully executed {action.upper()} {volume:.2f} lots! Ticket: {res.get('order_id', res.get('order', 'N/A'))}")
+                    else:
+                        st.error(f"Execution failed: {res.get('error', 'Unknown error')}")
+                except Exception as ex:
+                    st.error(f"Error executing trade: {ex}")
+                time.sleep(2)
+                st.rerun()
+
+    # ── Market Data Auto-fetch (realtime) ──
+    if ensure_mt5():
+        try:
+            current_sym = config.get("general", "symbol")
+            current_tf = config.get("general", "timeframe")
+            data = robot.exchange.fetch_ohlcv(current_sym, current_tf, 200)  # Direct fetch from MT5 API (no DB writing)
+            st.session_state["_last_data"] = data
+            st.session_state["_last_fetch_time"] = time.time()
+        except Exception as e:
+            st.caption(f"Realtime fetch error: {e}")
 
     # ── Market Controls ──
     with st.container(border=True):
@@ -47,8 +90,7 @@ def render():
             else:
                 symbol = st.text_input("Symbol", value=current_sym, key="chart_symbol")
             if symbol != config.get("general", "symbol"):
-                config.set("general", "symbol", symbol)
-                config.save()
+                config.set_global("general", "symbol", symbol)
                 refresh_robot(config)
                 st.rerun()
         with cc[1]:
@@ -57,17 +99,14 @@ def render():
             tf_idx = tf_opts.index(cur_tf) if cur_tf in tf_opts else 0
             timeframe = st.selectbox("Timeframe", tf_opts, index=tf_idx, key="chart_tf")
             if timeframe != cur_tf:
-                config.set("general", "timeframe", timeframe)
-                config.save()
+                config.set_global("general", "timeframe", timeframe)
+                from src.constants.timeframes import TIMEFRAME_MINUTES
+                tf_minutes = TIMEFRAME_MINUTES.get(timeframe, 15)
+                config.set_global("general", "cycle_interval_minutes", tf_minutes)
                 refresh_robot(config)
                 st.rerun()
-        with cc[2]:
-            data_count = st.number_input("Data Points", min_value=100, max_value=100000,
-                                         value=config.get("general", "data_count"), step=1000, key="chart_count")
-            saved = config.get("general", "data_count")
-            if data_count != saved:
-                config.set("general", "data_count", data_count)
-                config.save()
+        # Data count & candle selection removed for pure realtime mode
+        # Fixed window of last 200 candles will be displayed
         with cc[3]:
             fetch_now = st.button("Refresh Data", width='stretch', type="primary")
             if fetch_now:
@@ -75,7 +114,7 @@ def render():
                     try:
                         if not ensure_mt5():
                             st.stop()
-                        data = robot.fetch_data(data_count)
+                        data = robot.fetch_data(200)
                         st.success(f"Loaded {len(data)} candles")
                         st.session_state["_last_data"] = data
                         st.session_state["_last_fetch_time"] = time.time()
@@ -87,109 +126,46 @@ def render():
     with st.container(border=True):
         data = st.session_state.get("_last_data")
         if data is not None:
-            # Compact title and candle selector bar
-            ch_col1, ch_col2 = st.columns([3, 1], vertical_alignment="bottom")
-            with ch_col1:
-                st.markdown("<h4 style='margin:0 0 10px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>📊 Interactive Market Chart</h4>", unsafe_allow_html=True)
-            with ch_col2:
-                candle_opts = [50, 100, 200, 500, 1000, len(data)]
-                candle_labels = ["50", "100", "200", "500", "1000", f"All ({len(data)})"]
-                show_candles = st.selectbox("Candles", options=list(range(len(candle_opts))),
-                                            format_func=lambda i: candle_labels[i], index=2, key="chart_candles")
+            # Fixed display of last 200 candles for realtime view
+            limit = 200
+            chart_data = data.tail(limit) if len(data) > limit else data
+
+            # Reset index to get time column
+            df_json = chart_data.reset_index()
+            # Convert datetime to Unix epoch integer seconds
+            df_json['time'] = df_json['time'].astype('int64') // 10**9
             
-            limit = candle_opts[show_candles]
-            chart_data = data.iloc[-limit:] if limit < len(data) else data
+            # Convert to list of dicts
+            records = df_json[['time', 'open', 'high', 'low', 'close']].to_dict(orient='records')
+            
+            # Write to dashboard/static/chart_data.json
+            static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+            json_path = os.path.join(static_dir, "chart_data.json")
+            try:
+                with open(json_path, "w") as f:
+                    json.dump(records, f)
+            except Exception as e:
+                st.caption(f"Error saving chart data json: {e}")
 
-            sma20 = chart_data["close"].rolling(20).mean()
-            sma50 = chart_data["close"].rolling(50).mean()
-            vol_col = "tick_volume" if "tick_volume" in chart_data.columns else "volume"
-            colors = ["#26a69a" if chart_data["close"].iloc[i] >= chart_data["open"].iloc[i] else "#ef5350"
-                      for i in range(len(chart_data))]
+            # Get symbol info & current bid/ask
+            sym_info = robot.exchange.get_symbol_info(symbol)
+            symbol_desc = sym_info.get("description", "Spot Gold 100 Troy Oz")
+            digits = sym_info.get("digits", 2)
 
-            fig = go.Figure()
-            fig.add_trace(go.Candlestick(x=chart_data.index, open=chart_data["open"], high=chart_data["high"],
-                                         low=chart_data["low"], close=chart_data["close"], name="OHLC",
-                                         increasing_line_color="#26a69a", decreasing_line_color="#ef5350", showlegend=False))
-            fig.add_trace(go.Scatter(x=chart_data.index, y=sma20, name="SMA 20", line=dict(color="#ffa726", width=1.5)))
-            fig.add_trace(go.Scatter(x=chart_data.index, y=sma50, name="SMA 50", line=dict(color="#42a5f5", width=1.5)))
-            fig.add_trace(go.Bar(x=chart_data.index, y=chart_data[vol_col], name="Volume",
-                                 marker_color=colors, opacity=0.4, yaxis="y2", showlegend=False))
-            fig.update_layout(height=450,
-                              font=dict(family="Outfit, sans-serif", size=11),
-                              xaxis=dict(
-                                  rangeslider=dict(visible=True, thickness=0.06), 
-                                  type="date", 
-                                  gridcolor="rgba(255,255,255,0.04)",
-                                  zerolinecolor="rgba(255,255,255,0.04)"
-                              ),
-                              yaxis=dict(
-                                  title="Price ($)", 
-                                  domain=[0.25, 1.0], 
-                                  gridcolor="rgba(255,255,255,0.04)",
-                                  zerolinecolor="rgba(255,255,255,0.04)"
-                              ),
-                              yaxis2=dict(
-                                  title="Volume", 
-                                  domain=[0.0, 0.2], 
-                                  showgrid=False,
-                                  zerolinecolor="rgba(255,255,255,0.04)"
-                              ),
-                              legend=dict(
-                                  orientation="h", 
-                                  y=1.05, 
-                                  x=0.5, 
-                                  xanchor="center",
-                                  bgcolor="rgba(0,0,0,0)"
-                              ),
-                              margin=dict(l=40, r=10, t=10, b=10), 
-                              hovermode="x unified",
-                              template="plotly_dark", 
-                              dragmode="zoom",
-                              paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig, width='stretch')
+            ws_port = get_shared("ws_port", 8765)
+            static_port = get_shared("static_port", 8767)
 
-            # Clean HTML/CSS metrics bar
-            last_close = chart_data["close"].iloc[-1]
-            prev_close = chart_data["close"].iloc[-2]
-            change = last_close - prev_close
-            chg_pct = change / prev_close * 100
-            change_color = "#10b981" if change >= 0 else "#ef4444"
-            change_sign = "+" if change >= 0 else ""
-            open_val = chart_data['open'].iloc[-1]
-            high_val = chart_data['high'].iloc[-1]
-            low_val = chart_data['low'].iloc[-1]
-            vol_val = chart_data["close"].pct_change().std() * 100
+            # Let's url encode the parameters
+            params = urllib.parse.urlencode({
+                "ws_port": ws_port,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "digits": digits,
+                "desc": symbol_desc
+            })
 
-            html_metrics = f"""
-            <div style="font-family: 'Outfit', sans-serif; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-top: 10px;">
-                <div style="flex: 1; text-align: center;">
-                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">CURRENT</div>
-                    <div style="font-size: 0.85rem; font-weight: 800; color: {change_color};">${last_close:.2f} <span style="font-size: 0.7rem; font-weight: 600; margin-left: 2px;">{change_sign}${change:.2f} ({change_sign}{chg_pct:.2f}%)</span></div>
-                </div>
-                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
-                <div style="flex: 1; text-align: center;">
-                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">OPEN</div>
-                    <div style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">${open_val:.2f}</div>
-                </div>
-                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
-                <div style="flex: 1; text-align: center;">
-                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">HIGH</div>
-                    <div style="font-size: 0.85rem; font-weight: 700; color: #10b981;">${high_val:.2f}</div>
-                </div>
-                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
-                <div style="flex: 1; text-align: center;">
-                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">LOW</div>
-                    <div style="font-size: 0.85rem; font-weight: 700; color: #ef4444;">${low_val:.2f}</div>
-                </div>
-                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
-                <div style="flex: 1; text-align: center;">
-                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">VOLATILITY</div>
-                    <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc;">{vol_val:.3f}%</div>
-                </div>
-            </div>
-            """
-            st.markdown(html_metrics, unsafe_allow_html=True)
+            iframe_url = f"http://localhost:{static_port}/chart_panel.html?{params}"
+            st.iframe(iframe_url, height=520)
         else:
             st.info("Click 'Refresh Data' to load market data")
 
@@ -225,9 +201,18 @@ def render():
                 """), unsafe_allow_html=True)
                 
             with cb:
-                with st.spinner("Running backtest..."):
-                    results = robot.run_backtest_all(data)
-                    st.session_state.backtest_results = results
+                now = time.time()
+                last_backtest_time = st.session_state.get("_last_backtest_time", 0.0)
+                if now - last_backtest_time > 30.0 or "backtest_results" not in st.session_state:
+                    with st.spinner("Running backtest..."):
+                        try:
+                            results = robot.run_backtest_all(data)
+                            st.session_state.backtest_results = results
+                            st.session_state["_last_backtest_time"] = now
+                        except Exception as e:
+                            st.caption(f"Backtest error: {e}")
+                
+                results = st.session_state.get("backtest_results", {})
                 name = robot.best_strategy.name if robot.best_strategy else "N/A"
                 set_shared("best_strategy", name)
                 

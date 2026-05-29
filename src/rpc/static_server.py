@@ -48,7 +48,7 @@ class _DashboardHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         # Only serve allowed extensions
-        if not filepath.is_file() or filepath.suffix not in (".html", ".css", ".js", ".png", ".svg", ".ico"):
+        if not filepath.is_file() or filepath.suffix not in (".html", ".css", ".js", ".png", ".svg", ".ico", ".json"):
             self.send_response(404)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
@@ -62,6 +62,7 @@ class _DashboardHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             ".png": "image/png",
             ".svg": "image/svg+xml",
             ".ico": "image/x-icon",
+            ".json": "application/json; charset=utf-8",
         }
         content_type = content_type_map.get(filepath.suffix, "application/octet-stream")
 

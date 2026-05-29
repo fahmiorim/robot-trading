@@ -86,7 +86,9 @@ class Trainer:
                 from src.repositories.analytics_repo import AnalyticsRepository
                 from src.persistence.database import get_db
                 repo = AnalyticsRepository(get_db())
-                drift = repo.check_concept_drift(threshold_pct=5.0)
+                symbol = self.model.config.get("general", "symbol") if self.model.config else None
+                timeframe = self.model.config.get("general", "timeframe") if self.model.config else None
+                drift = repo.check_concept_drift(threshold_pct=5.0, symbol=symbol, timeframe=timeframe)
                 if drift.get("drifted"):
                     self._concept_drifted = True
                     logger.warning(

@@ -103,11 +103,15 @@ class AnalyticsRepository:
         """Persist an ML training run record."""
         return self._db.save_ml_training_log(log_data)
 
-    def get_ml_training_log(self, limit: int = 20) -> List[Dict]:
+    def get_ml_training_log(self, limit: int = 20,
+                            symbol: Optional[str] = None,
+                            timeframe: Optional[str] = None) -> List[Dict]:
         """Get recent ML training runs."""
-        return self._db.get_ml_training_log(limit=limit)
+        return self._db.get_ml_training_log(limit=limit, symbol=symbol, timeframe=timeframe)
 
-    def check_concept_drift(self, threshold_pct: float = 5.0) -> Dict[str, Any]:
+    def check_concept_drift(self, threshold_pct: float = 5.0,
+                            symbol: Optional[str] = None,
+                            timeframe: Optional[str] = None) -> Dict[str, Any]:
         """Check if latest training accuracy dropped >threshold_pct vs average of previous 3 runs.
 
         Returns:
@@ -117,7 +121,7 @@ class AnalyticsRepository:
             drop_pct: float — percentage drop relative to avg_prev_3
             n_available: int — number of training records available
         """
-        logs = self.get_ml_training_log(limit=4)
+        logs = self.get_ml_training_log(limit=4, symbol=symbol, timeframe=timeframe)
         result = {
             "drifted": False,
             "latest_acc": 0.0,

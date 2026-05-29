@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MT5 Real-Time Chart Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- TradingView Lightweight Charts CDN -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            margin: 0;
+            padding: 8px;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        .mt5-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            border: 1px solid #222;
+            border-radius: 6px;
+        }
+        .mt5-header-container {
+            background-color: #000000;
+            padding: 8px 12px;
+            border-bottom: 1px solid #111;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .mt5-quick-panel {
+            display: flex;
+            align-items: center;
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 2px;
+            height: 42px;
+        }
+        .mt5-arrow-toggle {
+            width: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            cursor: pointer;
+            font-size: 8px;
+            border-right: 1px solid #333;
+            height: 100%;
+            user-select: none;
+        }
+        .mt5-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 10px;
+            height: 100%;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.1s;
+        }
+        .mt5-sell-box {
+            background-color: #7a1c1c;
+            color: #fff;
+            border-radius: 2px 0 0 2px;
+        }
+        .mt5-sell-box:hover {
+            background-color: #9c2424;
+        }
+        .mt5-buy-box {
+            background-color: #7a1c1c;
+            color: #fff;
+            border-radius: 0 2px 2px 0;
+        }
+        .mt5-buy-box:hover {
+            background-color: #9c2424;
+        }
+        .mt5-box-title {
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            opacity: 0.8;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .mt5-price-display {
+            display: flex;
+            align-items: baseline;
+            line-height: 1;
+        }
+        .mt5-price-display .price-small {
+            font-size: 11px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        .mt5-price-display .price-large {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .mt5-lot-container {
+            display: flex;
+            align-items: center;
+            background-color: #111;
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
+            height: 100%;
+            width: 65px;
+            position: relative;
+        }
+        .mt5-lot-input {
+            width: 100%;
+            background: transparent !important;
+            border: none !important;
+            color: #fff !important;
+            font-size: 13px !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 0 16px 0 4px !important;
+            height: 100% !important;
+            outline: none !important;
+        }
+        .mt5-lot-arrows {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            right: 4px;
+            height: 100%;
+            justify-content: center;
+            gap: 1px;
+        }
+        .mt5-lot-arrow {
+            font-size: 7px;
+            color: #666;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1;
+            padding: 2px;
+        }
+        .mt5-lot-arrow:hover {
+            color: #fff;
+        }
+        .mt5-info-panel {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #c0c0c0;
+            font-size: 12px;
+            flex-grow: 1;
+            margin-left: 8px;
+        }
+        .mt5-symbol-label {
+            font-weight: bold;
+            color: #55aaff;
+        }
+        .mt5-desc-label {
+            color: #888;
+            margin-right: 8px;
+        }
+        .mt5-ohlc {
+            display: flex;
+            gap: 6px;
+            font-size: 11px;
+        }
+        .mt5-ohlc-item {
+            display: flex;
+            gap: 2px;
+        }
+        .mt5-ohlc-lbl {
+            color: #666;
+        }
+        .mt5-ohlc-val {
+            color: #e0e0e0;
+        }
+        .mt5-live-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px #00ff00;
+            animation: mt5-pulse 1s infinite;
+            margin-right: 4px;
+        }
+        @keyframes mt5-pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+        .mt5-time-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: auto;
+            font-size: 11px;
+            color: #00ff00;
+            font-family: monospace;
+        }
+        
+        /* Chart container */
+        #tv-chart {
+            flex-grow: 1;
+            width: 100%;
+            background-color: #000000;
+        }
+
+        /* Bottom metrics bar */
+        .mt5-metrics-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 8px 14px;
+            border-top: 1px solid #111;
+            font-size: 11px;
+        }
+        .metric-box {
+            flex: 1;
+            text-align: center;
+        }
+        .metric-lbl {
+            font-size: 0.6rem;
+            opacity: 0.5;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+        .metric-val {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .metric-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255,255,255,0.08);
+        }
+    </style>
+</head>
+<body>
+    <div class="mt5-container">
+        <!-- Header -->
+        <div class="mt5-header-container">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%;">
+                <div class="mt5-quick-panel">
+                    <div class="mt5-arrow-toggle">▼</div>
+                    <div class="mt5-box mt5-sell-box" id="sell-btn">
+                        <div class="mt5-box-title">SELL</div>
+                        <div class="mt5-price-display">
+                            <span class="price-small" id="sell-small">—.</span>
+                            <span class="price-large" id="sell-large">—</span>
+                        </div>
+                    </div>
+                    <div class="mt5-lot-container">
+                        <input type="number" id="lot-input" value="0.10" step="0.01" min="0.01" max="10.0" class="mt5-lot-input">
+                        <div class="mt5-lot-arrows">
+                            <div class="mt5-lot-arrow" id="lot-up">▲</div>
+                            <div class="mt5-lot-arrow" id="lot-down">▼</div>
+                        </div>
+                    </div>
+                    <div class="mt5-box mt5-buy-box" id="buy-btn">
+                        <div class="mt5-box-title">BUY</div>
+                        <div class="mt5-price-display">
+                            <span class="price-small" id="buy-small">—.</span>
+                            <span class="price-large" id="buy-large">—</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt5-info-panel">
+                    <span class="mt5-symbol-label" id="symbol-lbl">XAUUSD, TIMEFRAME_M1:</span>
+                    <span class="mt5-desc-label" id="desc-lbl">Spot Gold 100 Troy Oz</span>
+                    <div class="mt5-ohlc">
+                        <span class="mt5-ohlc-item"><span class="mt5-ohlc-lbl">O:</span><span class="mt5-ohlc-val" id="ohlc-o">—</span></span>
+                        <span class="mt5-ohlc-item"><span class="mt5-ohlc-lbl">H:</span><span class="mt5-ohlc-val" id="ohlc-h">—</span></span>
+                        <span class="mt5-ohlc-item"><span class="mt5-ohlc-lbl">L:</span><span class="mt5-ohlc-val" id="ohlc-l">—</span></span>
+                        <span class="mt5-ohlc-item"><span class="mt5-ohlc-lbl">C:</span><span class="mt5-ohlc-val" id="ohlc-c">—</span></span>
+                    </div>
+                    <div class="mt5-time-container">
+                        <span class="mt5-live-dot"></span>
+                        <span id="time-lbl">00:00:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TV Chart -->
+        <div id="tv-chart"></div>
+
+        <!-- Metrics -->
+        <div class="mt5-metrics-bar">
+            <div class="metric-box">
+                <div class="metric-lbl">CURRENT</div>
+                <div class="metric-val" id="m-current">—</div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+                <div class="metric-lbl">OPEN</div>
+                <div class="metric-val" id="m-open">—</div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+                <div class="metric-lbl">HIGH</div>
+                <div class="metric-val" id="m-high" style="color: #10b981;">—</div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+                <div class="metric-lbl">LOW</div>
+                <div class="metric-val" id="m-low" style="color: #ef4444;">—</div>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+                <div class="metric-lbl">VOLATILITY</div>
+                <div class="metric-val" id="m-vol" style="color: #a5b4fc;">—</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Options parsed from URL query
+        const urlParams = new URLSearchParams(window.location.search);
+        const wsPort = urlParams.get('ws_port') || '8765';
+        const symbol = urlParams.get('symbol') || 'XAUUSD';
+        const timeframe = urlParams.get('timeframe') || 'TIMEFRAME_M1';
+        const digits = parseInt(urlParams.get('digits') || '2');
+        const description = urlParams.get('desc') || 'Spot Gold 100 Troy Oz';
+
+        // Set initial label values
+        document.getElementById('symbol-lbl').innerText = `${symbol}, ${timeframe}:`;
+        document.getElementById('desc-lbl').innerText = description;
+        document.getElementById('lot-input').value = localStorage.getItem('mt5_lot') || '0.10';
+
+        // Local lot adjustments
+        document.getElementById('lot-up').onclick = () => {
+            const el = document.getElementById('lot-input');
+            let val = parseFloat(el.value) + 0.01;
+            el.value = val.toFixed(2);
+            localStorage.setItem('mt5_lot', el.value);
+        };
+        document.getElementById('lot-down').onclick = () => {
+            const el = document.getElementById('lot-input');
+            let val = parseFloat(el.value) - 0.01;
+            if (val < 0.01) val = 0.01;
+            el.value = val.toFixed(2);
+            localStorage.setItem('mt5_lot', el.value);
+        };
+        document.getElementById('lot-input').onchange = (e) => {
+            localStorage.setItem('mt5_lot', e.target.value);
+        };
+
+        // Initialize TV Lightweight Chart
+        const chartElement = document.getElementById('tv-chart');
+        const chart = LightweightCharts.createChart(chartElement, {
+            width: chartElement.clientWidth,
+            height: 380,
+            layout: {
+                background: { type: 'solid', color: '#000000' },
+                textColor: '#888888',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: 10,
+            },
+            grid: {
+                vertLines: { color: 'rgba(255, 255, 255, 0.12)', style: 3 }, // Dotted vertical
+                horzLines: { color: 'rgba(255, 255, 255, 0.12)', style: 3 }, // Dotted horizontal
+            },
+            rightPriceScale: {
+                borderVisible: false,
+                textColor: '#888888',
+            },
+            timeScale: {
+                borderVisible: false,
+                timeVisible: true,
+                secondsVisible: false,
+            },
+            crosshair: {
+                mode: 0, // Normal crosshair
+                vertLine: {
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    width: 1,
+                    style: 1, // Dashed
+                },
+                horzLine: {
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    width: 1,
+                    style: 1,
+                }
+            }
+        });
+
+        // Add candlestick series
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#00FF00',
+            downColor: '#FF0000',
+            borderUpColor: '#00FF00',
+            borderDownColor: '#FF0000',
+            wickUpColor: '#00FF00',
+            wickDownColor: '#FF0000',
+        });
+
+        let chartData = [];
+        let lastCandle = null;
+
+        // Fetch initial data from local JSON
+        fetch('chart_data.json?' + new Date().getTime())
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.length > 0) {
+                    // Map timestamps correctly for TV (Unix timestamp in seconds)
+                    chartData = data.map(c => {
+                        const t = typeof c.time === 'number' ? c.time : (new Date(c.time).getTime() / 1000);
+                        return {
+                            time: t,
+                            open: parseFloat(c.open),
+                            high: parseFloat(c.high),
+                            low: parseFloat(c.low),
+                            close: parseFloat(c.close)
+                        };
+                    });
+                    candleSeries.setData(chartData);
+                    lastCandle = chartData[chartData.length - 1];
+
+                    // Set initial header OHLC values
+                    updateOHLCLabels(lastCandle);
+                    updateMetrics(lastCandle.close, lastCandle.open, lastCandle.high, lastCandle.low);
+                }
+            })
+            .catch(err => console.error("Initial data load failed:", err));
+
+        // Format price to small/large parts
+        function formatPrice(price) {
+            if (!price) return { small: '0.', large: '00' };
+            const pStr = price.toFixed(digits);
+            if (pStr.length >= 2) {
+                return { small: pStr.slice(0, -2), large: pStr.slice(-2) };
+            }
+            return { small: pStr, large: '' };
+        }
+
+        function updateOHLCLabels(candle) {
+            if (!candle) return;
+            document.getElementById('ohlc-o').innerText = candle.open.toFixed(digits);
+            document.getElementById('ohlc-h').innerText = candle.high.toFixed(digits);
+            document.getElementById('ohlc-l').innerText = candle.low.toFixed(digits);
+            document.getElementById('ohlc-c').innerText = candle.close.toFixed(digits);
+        }
+
+        function updateMetrics(close, open, high, low) {
+            // CURRENT
+            const mCurr = document.getElementById('m-current');
+            const prevClose = chartData.length >= 2 ? chartData[chartData.length - 2].close : open;
+            const diff = close - prevClose;
+            const pct = (diff / prevClose) * 100;
+            const sign = diff >= 0 ? '+' : '';
+            const color = diff >= 0 ? '#10b981' : '#ef4444';
+            mCurr.innerHTML = `$${close.toFixed(digits)} <span style="font-size:0.7rem; color:${color}; font-weight:600; margin-left:3px;">${sign}$${diff.toFixed(digits)} (${sign}${pct.toFixed(2)}%)</span>`;
+
+            // Open, High, Low
+            document.getElementById('m-open').innerText = `$${open.toFixed(digits)}`;
+            document.getElementById('m-high').innerText = `$${high.toFixed(digits)}`;
+            document.getElementById('m-low').innerText = `$${low.toFixed(digits)}`;
+
+            // Volatility Estimate (Standard Deviation proxy)
+            if (chartData.length > 5) {
+                let sum = 0;
+                let returns = [];
+                for (let i = 1; i < chartData.length; i++) {
+                    const ret = (chartData[i].close - chartData[i-1].close) / chartData[i-1].close;
+                    returns.push(ret);
+                    sum += ret;
+                }
+                const mean = sum / returns.length;
+                let variance = 0;
+                returns.forEach(r => variance += Math.pow(r - mean, 2));
+                const stdDev = Math.sqrt(variance / returns.length) * 100;
+                document.getElementById('m-vol').innerText = `${stdDev.toFixed(3)}%`;
+            } else {
+                document.getElementById('m-vol').innerText = '0.154%';
+            }
+        }
+
+        // Keep local time clock ticking
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('time-lbl').innerText = now.toTimeString().split(' ')[0];
+        }, 1000);
+
+        // Helper to round timeframe for new candle detection
+        function roundTimeframe(timeInSeconds, tf) {
+            let minutes = 1;
+            if (tf.includes("M5")) minutes = 5;
+            else if (tf.includes("M15")) minutes = 15;
+            else if (tf.includes("M30")) minutes = 30;
+            else if (tf.includes("H1")) minutes = 60;
+            else if (tf.includes("H4")) minutes = 240;
+            else if (tf.includes("D1")) minutes = 1440;
+            
+            const seconds = minutes * 60;
+            return Math.floor(timeInSeconds / seconds) * seconds;
+        }
+
+        // Establish WebSocket Connection
+        let ws = null;
+        function connectWS() {
+            let host = window.location.hostname;
+            if (!host || host === "" || host === "null") host = "localhost";
+            
+            ws = new WebSocket(`ws://${host}:${wsPort}`);
+            
+            ws.onopen = () => {
+                console.log("WebSocket connected for Live Chart");
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    
+                    // Direct order feedback
+                    if (data.type === "action_result") {
+                        alert(data.message);
+                        return;
+                    }
+
+                    // Ticks prices
+                    if (data.type === "market_data" && data.price && data.price.symbol === symbol) {
+                        const bid = parseFloat(data.price.bid);
+                        const ask = parseFloat(data.price.ask);
+                        
+                        if (!bid || !ask) return;
+
+                        // Update Quick buttons
+                        const sParts = formatPrice(bid);
+                        const bParts = formatPrice(ask);
+                        
+                        document.getElementById('sell-small').innerText = sParts.small;
+                        document.getElementById('sell-large').innerText = sParts.large;
+                        document.getElementById('buy-small').innerText = bParts.small;
+                        document.getElementById('buy-large').innerText = bParts.large;
+
+                        // Update Candle in chart
+                        if (data.price.time) {
+                            window.brokerOffsetSec = data.price.time - Math.floor(new Date().getTime() / 1000);
+                        }
+                        let tickTimeSec = data.price.time;
+                        if (!tickTimeSec) {
+                            const offset = window.brokerOffsetSec || 0;
+                            tickTimeSec = Math.floor(new Date().getTime() / 1000) + offset;
+                        }
+                        const roundedTime = roundTimeframe(tickTimeSec, timeframe);
+
+                        if (lastCandle) {
+                            if (roundedTime > lastCandle.time) {
+                                // Create a new candle
+                                const newCandle = {
+                                    time: roundedTime,
+                                    open: bid,
+                                    high: bid,
+                                    low: bid,
+                                    close: bid
+                                };
+                                chartData.push(newCandle);
+                                if (chartData.length > 200) {
+                                    chartData.shift();
+                                }
+                                lastCandle = newCandle;
+                            } else {
+                                // Update current last candle
+                                lastCandle.close = bid;
+                                if (bid > lastCandle.high) lastCandle.high = bid;
+                                if (bid < lastCandle.low) lastCandle.low = bid;
+                            }
+                            
+                            // Draw updated candle series
+                            candleSeries.update(lastCandle);
+                            updateOHLCLabels(lastCandle);
+                            updateMetrics(lastCandle.close, lastCandle.open, lastCandle.high, lastCandle.low);
+                        }
+                    }
+                } catch(err) {
+                    console.error("WS error:", err);
+                }
+            };
+
+            ws.onclose = () => {
+                setTimeout(connectWS, 2000);
+            };
+        }
+
+        // Trading execution
+        function sendOrder(side) {
+            const vol = parseFloat(document.getElementById('lot-input').value) || 0.10;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if (confirm(`Open ${side.toUpperCase()} ${vol} lots on ${symbol}?`)) {
+                    ws.send(JSON.stringify({
+                        action: "open_trade",
+                        symbol: symbol,
+                        side: side,
+                        volume: vol
+                    }));
+                }
+            } else {
+                alert("WS connection not active, please wait!");
+            }
+        }
+
+        document.getElementById('sell-btn').onclick = () => sendOrder('sell');
+        document.getElementById('buy-btn').onclick = () => sendOrder('buy');
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            chart.resize(chartElement.clientWidth, 380);
+        });
+
+        // Start WebSocket
+        connectWS();
+    </script>
+</body>
+</html>

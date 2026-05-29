@@ -152,7 +152,7 @@ def _render_category(config, section: str, icon: str, label: str,
     edited_df = st.data_editor(
         df,
         column_config=col_config,
-        use_container_width=True,
+        width='stretch',
         height=h,
         key=f"tf_editor_{section}_{label.lower().replace(' ', '_')}",
         num_rows="fixed",
@@ -240,7 +240,7 @@ def render(config) -> bool:
 
     with col_all:
         st.caption("Reset All")
-        if st.button("⚠️ Reset All", type="primary", use_container_width=True,
+        if st.button("⚠️ Reset All", type="primary", width='stretch',
                      help="Hapus SEMUA override di semua timeframe → kembali ke global default"):
             if "confirm_reset_all" not in st.session_state:
                 st.session_state.confirm_reset_all = True
@@ -249,7 +249,7 @@ def render(config) -> bool:
     for i, tf_key in enumerate(ALL_TFS):
         with tf_cols[i]:
             st.caption(f"Reset {TF_SHORT[tf_key]}")
-            if st.button(f"↺ {TF_SHORT[tf_key]}", use_container_width=True,
+            if st.button(f"↺ {TF_SHORT[tf_key]}", width='stretch',
                          key=f"reset_{tf_key}",
                          help=f"Hapus semua override **{TF_SHORT[tf_key]}** → kembali ke global default"):
                 _reset_single_tf(config, tf_key)
@@ -258,10 +258,10 @@ def render(config) -> bool:
         st.warning("⚠️ Yakin ingin **menghapus semua override timeframe**? Tindakan ini tidak bisa dibatalkan.")
         c1, c2, _ = st.columns([1, 1, 6])
         with c1:
-            if st.button("✅ Ya, Reset All", type="primary", use_container_width=True):
+            if st.button("✅ Ya, Reset All", type="primary", width='stretch'):
                 _reset_all_tfs(config)
         with c2:
-            if st.button("❌ Batal", use_container_width=True):
+            if st.button("❌ Batal", width='stretch'):
                 st.session_state.confirm_reset_all = False
                 st.rerun()
 

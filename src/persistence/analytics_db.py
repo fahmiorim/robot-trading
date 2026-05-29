@@ -266,15 +266,31 @@ class AnalyticsMixin:
             logger.error(f"Save ML training log failed: {e}")
             return False
 
-    def get_ml_training_log(self, limit: int = 20) -> List[Dict]:
+    def get_ml_training_log(self, limit: int = 20,
+                            symbol: Optional[str] = None,
+                            timeframe: Optional[str] = None) -> List[Dict]:
         """Get recent ML training runs, newest first."""
         try:
             conn = self.connect()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("""
-                SELECT * FROM ml_training_log
-                ORDER BY trained_at DESC LIMIT %s
-            """, (limit,))
+            
+            query = "SELECT * FROM ml_training_log"
+            params = []
+            conditions = []
+            if symbol:
+                conditions.append("symbol = %s")
+                params.append(symbol)
+            if timeframe:
+                conditions.append("timeframe = %s")
+                params.append(timeframe)
+            
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+                
+            query += " ORDER BY trained_at DESC LIMIT %s"
+            params.append(limit)
+            
+            cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
             cursor.close()
             result = []

@@ -33,24 +33,27 @@ class SettingsMixin:
             with open(sql_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Extract the INSERT IGNORE INTO settings block
-            m = re.search(
+            # Extract all INSERT IGNORE INTO settings blocks
+            matches = list(re.finditer(
                 r"INSERT IGNORE INTO settings\s+.*?;",
                 content,
                 re.DOTALL,
-            )
-            if not m:
+            ))
+            if not matches:
                 logger.warning("No INSERT IGNORE INTO settings found in schema.sql")
                 return False
 
             cursor = conn.cursor()
-            insert_sql = m.group(0)
-            cursor.execute(insert_sql)
-            conn.commit()
-            affected = cursor.rowcount
+            total_affected = 0
+            for m in matches:
+                insert_sql = m.group(0)
+                cursor.execute(insert_sql)
+                conn.commit()
+                if cursor.rowcount > 0:
+                    total_affected += cursor.rowcount
             cursor.close()
-            if affected > 0:
-                logger.info(f"Settings seeded from schema.sql ({affected} rows added)")
+            if total_affected > 0:
+                logger.info(f"Settings seeded from schema.sql ({total_affected} rows added)")
             else:
                 logger.debug("Settings already up to date — no rows added")
             return True
