@@ -1,4 +1,4 @@
-﻿"""Performance Analytics page — actual trade history, backtesting, advanced stats, hyperopt."""
+"""Performance Analytics page — actual trade history, backtesting, advanced stats, hyperopt."""
 
 import streamlit as st
 import pandas as pd
@@ -38,16 +38,38 @@ def render():
 
                     summary = dc.get_trade_summary(days)
                     if summary:
-                        st.subheader("📊 Aggregate Stats")
-                        c1, c2, c3, c4 = st.columns(4)
-                        with c1:
-                            st.metric("Total Trades", int(summary.get('total_trades', 0)))
-                        with c2:
-                            st.metric("Open Trades", int(summary.get('open_trades', 0)))
-                        with c3:
-                            st.metric("Total P&L", f"${summary.get('total_profit', 0):.2f}")
-                        with c4:
-                            st.metric("Win Rate", f"{summary.get('win_rate', 0):.1f}%")
+                        st.markdown("<h4 style='margin:12px 0 4px; font-size:1rem; font-weight:700; color:#a5b4fc;'>📊 Aggregate Stats</h4>", unsafe_allow_html=True)
+                        tot = int(summary.get('total_trades', 0))
+                        opn = int(summary.get('open_trades', 0))
+                        pnl = float(summary.get('total_profit', 0))
+                        wr  = float(summary.get('win_rate', 0))
+                        pnl_color = "#10b981" if pnl >= 0 else "#ef4444"
+                        pnl_sign  = "+" if pnl >= 0 else ""
+                        st.markdown(f"""
+                        <div style="font-family:'Outfit',sans-serif; display:flex; justify-content:space-between;
+                             align-items:center; background:rgba(255,255,255,0.02); padding:10px 16px;
+                             border-radius:8px; border:1px solid rgba(255,255,255,0.05); margin:4px 0 12px;">
+                            <div style="flex:1; text-align:center;">
+                                <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">TOTAL TRADES</div>
+                                <div style="font-size:0.9rem; font-weight:800; color:#ffffff;">{tot}</div>
+                            </div>
+                            <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                            <div style="flex:1; text-align:center;">
+                                <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">OPEN TRADES</div>
+                                <div style="font-size:0.9rem; font-weight:800; color:#a5b4fc;">{opn}</div>
+                            </div>
+                            <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                            <div style="flex:1; text-align:center;">
+                                <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">TOTAL P&L</div>
+                                <div style="font-size:0.9rem; font-weight:800; color:{pnl_color};">{pnl_sign}${pnl:.2f}</div>
+                            </div>
+                            <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                            <div style="flex:1; text-align:center;">
+                                <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">WIN RATE</div>
+                                <div style="font-size:0.9rem; font-weight:800; color:#f59e0b;">{wr:.1f}%</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
                     st.info("No trade history in database")
             else:
@@ -104,21 +126,44 @@ def render():
         if not results:
             st.info("💡 No results yet. Click **Run Full Backtest** or **Fetch & Backtest**.")
         else:
-            st.subheader("📊 Performance Summary")
+            st.markdown("<h4 style='margin:8px 0 4px; font-size:1rem; font-weight:700; color:#a5b4fc;'>📊 Performance Summary</h4>", unsafe_allow_html=True)
             best_name = max(results.keys(), key=lambda k: results[k]['total_return'])
             best = results[best_name]
-            m1, m2, m3, m4, m5 = st.columns(5)
-            with m1:
-                st.metric("Best Strategy", best_name)
-            with m2:
-                st.metric("Return", f"{best['total_return']:.2f}%")
-            with m3:
-                st.metric("Trades", sum(r['num_trades'] for r in results.values()))
-            with m4:
-                st.metric("Avg Return", f"{sum(r['total_return'] for r in results.values()) / len(results):.2f}%")
-            with m5:
-                avg_sharpe = sum(r.get('sharpe_ratio', 0) for r in results.values()) / len(results)
-                st.metric("Avg Sharpe", f"{avg_sharpe:.2f}")
+            _tot_trades = sum(r['num_trades'] for r in results.values())
+            _avg_ret = sum(r['total_return'] for r in results.values()) / len(results)
+            avg_sharpe = sum(r.get('sharpe_ratio', 0) for r in results.values()) / len(results)
+            _ret_color = '#10b981' if best['total_return'] >= 0 else '#ef4444'
+            _avg_color = '#10b981' if _avg_ret >= 0 else '#ef4444'
+            st.markdown(f"""
+            <div style="font-family:'Outfit',sans-serif; display:flex; justify-content:space-between;
+                 align-items:center; background:rgba(255,255,255,0.02); padding:10px 16px;
+                 border-radius:8px; border:1px solid rgba(255,255,255,0.05); margin:4px 0 12px;">
+                <div style="flex:2; text-align:center;">
+                    <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">BEST STRATEGY</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:#ffffff;">{best_name}</div>
+                </div>
+                <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                <div style="flex:1; text-align:center;">
+                    <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">RETURN</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:{_ret_color};">{best['total_return']:.2f}%</div>
+                </div>
+                <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                <div style="flex:1; text-align:center;">
+                    <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">TRADES</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:#ffffff;">{_tot_trades}</div>
+                </div>
+                <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                <div style="flex:1; text-align:center;">
+                    <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">AVG RETURN</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:{_avg_color};">{_avg_ret:.2f}%</div>
+                </div>
+                <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                <div style="flex:1; text-align:center;">
+                    <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">AVG SHARPE</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:#a5b4fc;">{avg_sharpe:.2f}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             st.subheader("📋 Strategy Comparison")
             rows = []
@@ -172,47 +217,51 @@ def render():
             r = results[selected_strat]
 
             # Ratios & Annualised Metrics
-            aa1, aa2, aa3, aa4, aa5, aa6 = st.columns(6)
-            with aa1:
-                sortino = r.get('sortino_ratio', 0)
-                sharpe = r.get('sharpe_ratio', 0)
-                st.metric("Sortino Ratio", f"{sortino:.2f}", delta=f"Sharpe: {sharpe:.2f}", delta_color="normal")
-            with aa2:
-                calmar = r.get('calmar_ratio', 0)
-                st.metric("Calmar Ratio", f"{calmar:.2f}", help="Annualised return / Max Drawdown")
-            with aa3:
-                pf = r.get('profit_factor', 0)
-                st.metric("Profit Factor", f"{pf:.2f}", delta="Good > 1.5" if pf > 1.5 else "Poor < 1.0" if pf < 1.0 else "OK",
-                         delta_color="normal" if pf > 1.0 else "inverse")
-            with aa4:
-                cagr = r.get('cagr_pct', 0)
-                st.metric("CAGR %", f"{cagr:.2f}%", help="Compound Annual Growth Rate")
-            with aa5:
-                sqn = r.get('sqn', 0)
-                sqn_qual = "Excellent" if sqn > 3 else "Good" if sqn > 2 else "Poor"
-                st.metric("SQN", f"{sqn:.2f}", delta=sqn_qual, delta_color="normal" if sqn > 2 else "inverse")
-            with aa6:
-                exp_pct = r.get('expectancy_pct', 0)
-                st.metric("Expectancy %", f"{exp_pct:.3f}%", help="Expected return per trade as % of balance")
+            sortino = r.get('sortino_ratio', 0)
+            sharpe  = r.get('sharpe_ratio', 0)
+            calmar  = r.get('calmar_ratio', 0)
+            pf      = r.get('profit_factor', 0)
+            cagr    = r.get('cagr_pct', 0)
+            sqn     = r.get('sqn', 0)
+            exp_pct = r.get('expectancy_pct', 0)
+            _aw = r.get('avg_win_pct', 0)
+            _al = r.get('avg_loss_pct', 0)
+            awr = _aw / abs(_al) if _al != 0 else 0
+            exp_ratio = r.get('expectancy_ratio', 0)
+            pf_color  = '#10b981' if pf > 1.5 else '#ef4444' if pf < 1.0 else '#f59e0b'
+            sqn_color = '#10b981' if sqn > 2 else '#ef4444'
 
-            # Streaks, Expectancy Ratio & Averages
-            aa7, aa8, aa9, aa10, aa11, aa12 = st.columns(6)
-            with aa7:
-                _aw = r.get('avg_win_pct', 0)
-                _al = r.get('avg_loss_pct', 0)
-                awr = _aw / abs(_al) if _al != 0 else 0
-                st.metric("Avg Win/Loss", f"{awr:.2f}", help="Average winning trade % / Average losing trade %")
-            with aa8:
-                exp_ratio = r.get('expectancy_ratio', 0)
-                st.metric("Expectancy Ratio", f"{exp_ratio:.2f}", help="Avg Win / |Avg Loss| — > 1 = good")
-            with aa9:
-                st.metric("Longest Win Streak", f"{r.get('longest_win_streak', 0)}")
-            with aa10:
-                st.metric("Longest Loss Streak", f"{r.get('longest_loss_streak', 0)}")
-            with aa11:
-                st.metric("Avg Win %", f"{r.get('avg_win_pct', 0):.1f}%")
-            with aa12:
-                st.metric("Avg Loss %", f"{r.get('avg_loss_pct', 0):.1f}%")
+            def _mbar(*items):
+                """Render a horizontal HTML metrics bar from list of (label, value, color) tuples."""
+                sep = '<div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>'
+                cells = sep.join(f'''
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:0.6rem; opacity:0.5; font-weight:700; text-transform:uppercase;
+                             letter-spacing:0.05em; margin-bottom:2px;">{lbl}</div>
+                        <div style="font-size:0.85rem; font-weight:800; color:{col};">{val}</div>
+                    </div>''' for lbl, val, col in items)
+                st.markdown(f'<div style="font-family:\'Outfit\',sans-serif; display:flex; align-items:center; '
+                            f'background:rgba(255,255,255,0.02); padding:10px 14px; border-radius:8px; '
+                            f'border:1px solid rgba(255,255,255,0.05); margin:4px 0 8px;">{cells}</div>',
+                            unsafe_allow_html=True)
+
+            _mbar(
+                ("SORTINO",      f"{sortino:.2f}",   '#10b981' if sortino > 1 else '#ef4444'),
+                ("SHARPE",       f"{sharpe:.2f}",    '#10b981' if sharpe > 1 else '#ef4444'),
+                ("CALMAR",       f"{calmar:.2f}",    '#10b981' if calmar > 0.5 else '#f59e0b'),
+                ("PROFIT FACTOR",f"{pf:.2f}",        pf_color),
+                ("CAGR %",       f"{cagr:.2f}%",     '#10b981' if cagr > 0 else '#ef4444'),
+                ("SQN",          f"{sqn:.2f}",        sqn_color),
+                ("EXPECTANCY %", f"{exp_pct:.3f}%",  '#a5b4fc'),
+            )
+            _mbar(
+                ("AVG WIN/LOSS",      f"{awr:.2f}",                           '#10b981' if awr > 1 else '#ef4444'),
+                ("EXPECTANCY RATIO",  f"{exp_ratio:.2f}",                     '#10b981' if exp_ratio > 1 else '#f59e0b'),
+                ("WIN STREAK",        f"{r.get('longest_win_streak', 0)}",    '#10b981'),
+                ("LOSS STREAK",       f"{r.get('longest_loss_streak', 0)}",   '#ef4444'),
+                ("AVG WIN %",         f"{r.get('avg_win_pct', 0):.1f}%",      '#10b981'),
+                ("AVG LOSS %",        f"{r.get('avg_loss_pct', 0):.1f}%",     '#ef4444'),
+            )
 
             cur_w = r.get('current_win_streak', 0)
             cur_l = r.get('current_loss_streak', 0)
@@ -377,19 +426,35 @@ def render():
                 st.markdown("---")
                 st.subheader("🏆 Hyperopt Results")
 
-                ho_summary_cols = st.columns(4)
-                with ho_summary_cols[0]:
-                    best_sid = max(ho_results.keys(), key=lambda k: ho_results[k]['score'])
-                    st.metric("Best Strategy", best_sid)
-                with ho_summary_cols[1]:
-                    best_score = ho_results[best_sid]['score']
-                    st.metric("Best Score", f"{best_score:.2f}")
-                with ho_summary_cols[2]:
-                    total_trials = sum(r['n_trials'] for r in ho_results.values())
-                    st.metric("Total Trials", f"{total_trials}")
-                with ho_summary_cols[3]:
-                    total_time = sum(r['elapsed'] for r in ho_results.values())
-                    st.metric("Total Time", f"{total_time:.1f}s")
+                best_sid     = max(ho_results.keys(), key=lambda k: ho_results[k]['score'])
+                best_score   = ho_results[best_sid]['score']
+                total_trials = sum(r['n_trials'] for r in ho_results.values())
+                total_time   = sum(r['elapsed'] for r in ho_results.values())
+                st.markdown(f"""
+                <div style="font-family:'Outfit',sans-serif; display:flex; align-items:center;
+                     background:rgba(255,255,255,0.02); padding:10px 16px; border-radius:8px;
+                     border:1px solid rgba(255,255,255,0.05); margin:4px 0 12px;">
+                    <div style="flex:2; text-align:center;">
+                        <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">BEST STRATEGY</div>
+                        <div style="font-size:0.85rem; font-weight:800; color:#ffffff;">{best_sid}</div>
+                    </div>
+                    <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">BEST SCORE</div>
+                        <div style="font-size:0.85rem; font-weight:800; color:#10b981;">{best_score:.2f}</div>
+                    </div>
+                    <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">TOTAL TRIALS</div>
+                        <div style="font-size:0.85rem; font-weight:800; color:#a5b4fc;">{total_trials}</div>
+                    </div>
+                    <div style="width:1px; height:22px; background:rgba(255,255,255,0.08);"></div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:0.62rem; opacity:0.5; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px;">TOTAL TIME</div>
+                        <div style="font-size:0.85rem; font-weight:800; color:#f59e0b;">{total_time:.1f}s</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
                 for sid, hresult in ho_results.items():
                     with st.expander(f"🧬 {sid} — Score: {hresult['score']:.2f}", expanded=True):
