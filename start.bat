@@ -9,7 +9,6 @@ echo Memulai Streamlit dashboard...
 echo.
 cd /d "D:\laragon\www\robot-trading"
 
-rem Jalankan Streamlit langsung — lebih stabil dari python -m dashboard
-python -m streamlit run dashboard.py --server.port=8501
+python -m streamlit run dashboard.py --server.port=8502
 
 pause
