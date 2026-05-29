@@ -74,7 +74,7 @@ def _render_sidebar():
         """, unsafe_allow_html=True)
 
         # Navigation
-        page_labels = ["📊 Dashboard", "📈 Charts", "📊 Performance", "⚙️ Settings"]
+        page_labels = ["📊 Dashboard", "📈 Charts", "📊 Performance", "⚙️ Settings", "ℹ️ About"]
 
         selected = st.radio(
             "Navigation", page_labels,
@@ -144,7 +144,7 @@ def run():
     page = _render_sidebar()
 
     # Route to the appropriate page
-    from dashboard.pages import dashboard_page, charts_page, performance_page, settings_page
+    from dashboard.pages import dashboard_page, charts_page, performance_page, settings_page, about_page
 
     if page == "📊 Dashboard":
         dashboard_page.render()
@@ -154,5 +154,7 @@ def run():
         performance_page.render()
     elif page == "⚙️ Settings":
         settings_page.render()
+    elif page == "ℹ️ About":
+        about_page.render()
 
 

@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 
 from dashboard.helpers import refresh_robot
 
@@ -74,20 +74,3 @@ def render():
         if edited:
             st.info("\u26a1 Changes detected \u2014 click Save Config")
 
-    # ── ABOUT SYSTEM INFO ────────────────────────────────────
-    st.markdown("---")
-    with st.expander("ℹ️ About AI Trading Robot v2.0", expanded=False):
-        st.markdown("""
-        ### 🤖 AI Trading Robot v2.0
-        
-        **Features:**
-        - **Multi-Strategy Core**: 5 technical strategies (MA Crossover, RSI, MACD, Bollinger Bands, Breakout)
-        - **ML Integration**: Random Forest / Gradient Boosting / LSTM single-step prediction
-        - **Market Regime Filter**: ADX-based regime classifier (Trending, Ranging, Choppy)
-        - **Swarm Intelligence**: Weighted ensemble voting for trading consensus
-        - **Backtester**: Tick-accurate historical simulation (slippage, spread, commission)
-        - **Risk Controller**: Circuit breaker, daily drawdown, daily loss, cooldown timer
-        - **Notification RPC**: Telegram alerts and real-time WebSocket dashboard
-        
-        **Tech Stack:** Python, MetaTrader 5, pandas, numpy, scikit-learn, Streamlit, Plotly
-        """)
