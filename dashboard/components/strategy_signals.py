@@ -19,11 +19,13 @@ def render_strategy_signals(robot, data):
         return
 
     try:
+        # Gunakan raw signals per source (bukan consensus voting)
+        raw = robot.get_individual_signals(data)
         s1, s2, s3, s4 = st.columns(4)
-        _render_signal_badge(s1, "Strategy", robot.get_signal(data))
-        _render_signal_badge(s2, "ML", robot.get_signal(data, use_ml=True))
-        _render_signal_badge(s3, "Agent", robot.get_signal(data, use_agent=True))
-        _render_signal_badge(s4, "Swarm", robot.get_signal(data, use_swarm=True))
+        _render_signal_badge(s1, "Strategy", raw.get("strategy", 0))
+        _render_signal_badge(s2, "ML", raw.get("ml", 0))
+        _render_signal_badge(s3, "Agent", raw.get("agent", 0))
+        _render_signal_badge(s4, "Swarm", raw.get("swarm", 0))
     except Exception as e:
         st.info(f"Signals unavailable: {e}")
 

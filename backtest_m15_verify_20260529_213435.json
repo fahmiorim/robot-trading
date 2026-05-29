@@ -1,0 +1,72 @@
+[
+  {
+    "strategy": "Breakout",
+    "total_return": 0.10626292795801419,
+    "sharpe_ratio": 2.127,
+    "sortino_ratio": 3.882,
+    "max_drawdown": 0.12448393954562575,
+    "win_rate": 40.0,
+    "num_trades": 65,
+    "profit_factor": 1.249,
+    "cagr_pct": 0.878,
+    "sqn": 0.747,
+    "calmar_ratio": 0.854,
+    "expectancy_ratio": 1.873
+  },
+  {
+    "strategy": "MA_Crossover",
+    "total_return": 0.148244785002571,
+    "sharpe_ratio": 2.887,
+    "sortino_ratio": 5.221,
+    "max_drawdown": 0.10982819868572186,
+    "win_rate": 45.31,
+    "num_trades": 128,
+    "profit_factor": 1.276,
+    "cagr_pct": 1.219,
+    "sqn": 1.013,
+    "calmar_ratio": 1.35,
+    "expectancy_ratio": 1.54
+  },
+  {
+    "strategy": "RSI",
+    "total_return": 0.08041176980750606,
+    "sharpe_ratio": 3.344,
+    "sortino_ratio": 6.234,
+    "max_drawdown": 0.04142795093795705,
+    "win_rate": 62.5,
+    "num_trades": 8,
+    "profit_factor": 2.263,
+    "cagr_pct": 0.701,
+    "sqn": 1.174,
+    "calmar_ratio": 1.941,
+    "expectancy_ratio": 1.358
+  },
+  {
+    "strategy": "MACD",
+    "total_return": -0.17905367193094207,
+    "sharpe_ratio": -3.185,
+    "sortino_ratio": -4.914,
+    "max_drawdown": 0.324873759313925,
+    "win_rate": 32.57,
+    "num_trades": 175,
+    "profit_factor": 0.802,
+    "cagr_pct": -1.445,
+    "sqn": -1.118,
+    "calmar_ratio": -0.551,
+    "expectancy_ratio": 1.661
+  },
+  {
+    "strategy": "Bollinger",
+    "total_return": 0.18717473517857797,
+    "sharpe_ratio": 6.117,
+    "sortino_ratio": 12.185,
+    "max_drawdown": 0.07837739973862203,
+    "win_rate": 66.67,
+    "num_trades": 15,
+    "profit_factor": 2.958,
+    "cagr_pct": 1.6,
+    "sqn": 2.147,
+    "calmar_ratio": 2.388,
+    "expectancy_ratio": 1.479
+  }
+]

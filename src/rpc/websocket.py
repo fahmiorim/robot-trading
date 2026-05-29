@@ -115,6 +115,8 @@ class WebSocketRPC(IRPC):
             self._loop.close()
             self._loop = None
 
+
+
     async def _serve(self) -> None:
         while self._running:
             try:
@@ -232,6 +234,18 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
     """Start background thread that polls the exchange and broadcasts."""
     def _push():
         err_count = 0
+
+        # ── Establish DB connection once for this thread ────────
+        # DatabaseManager uses threading.local() internally, so each thread
+        # gets its own connection.  By calling connect() here we ensure the
+        # connection is ready *before* the first data push cycle, and the
+        # "MySQL connection established" log appears only once at startup.
+        try:
+            from src.persistence.database import get_db
+            get_db().connect()
+        except Exception:
+            pass
+
         # Wait for the WebSocket server to start running
         for _ in range(50):
             if ws._running:
@@ -276,6 +290,14 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                     margin_level = balance.get("margin_level", 0.0)
                     mt5_connected = exchange.is_connected()
 
+                # Update risk manager's balance so drawdown is calculated correctly
+                # (WebSocket pusher runs between cycles, so risk.balance stays stale otherwise)
+                try:
+                    bot.risk.update_balance(account_balance)
+                    bot.risk.protection_ctx.open_positions = len(positions) if positions else 0
+                except Exception:
+                    pass
+
                 regime = get_shared("regime", "unknown")
                 auto = get_shared("auto_trading", False)
                 strategy = get_shared("best_strategy", "N/A")
@@ -294,10 +316,12 @@ def start_data_pusher(ws: WebSocketRPC, bot: Any,
                 sig_swarm = 0
                 if candles is not None and not candles.empty:
                     try:
-                        sig_strat = bot.get_signal(candles)
-                        sig_ml = bot.get_signal(candles, use_ml=True)
-                        sig_agent = bot.get_signal(candles, use_agent=True)
-                        sig_swarm = bot.get_signal(candles, use_swarm=True)
+                        # Gunakan raw signals per source (bukan consensus)
+                        raw = bot.get_individual_signals(candles)
+                        sig_strat = raw.get("strategy", 0)
+                        sig_ml = raw.get("ml", 0)
+                        sig_agent = raw.get("agent", 0)
+                        sig_swarm = raw.get("swarm", 0)
                     except Exception:
                         pass
 

@@ -1,6 +1,6 @@
 """
 Risk Settings Tab — premium glass cards with Indonesian descriptions.
-Merged from Protection tab: stoploss guard params.
+Merged from Protection tab and DCA tab.
 """
 import streamlit as st
 import textwrap
@@ -50,26 +50,6 @@ RISK_INFO = {
     },
 }
 
-CB_INFO = {
-    "circuit_breaker_enabled": {
-        "icon": "🛡️",
-        "label": "Aktifkan Circuit Breaker",
-        "help": "Matikan trading otomatis jika terjadi kerugian cepat dalam waktu singkat.",
-    },
-    "circuit_breaker_loss_pct": {
-        "icon": "📉",
-        "label": "Batas Rugi Cepat (%)",
-        "min": 1.0, "max": 50.0, "step": 1.0,
-        "help": "Persentase kerugian dalam window tertentu yang memicu circuit breaker.",
-    },
-    "circuit_breaker_cooldown_minutes": {
-        "icon": "🔄",
-        "label": "Cooldown CB (menit)",
-        "min": 10, "max": 1440, "step": 10,
-        "help": "Waktu tunggu sebelum circuit breaker di-reset otomatis.",
-    },
-}
-
 TS_INFO = {
     "use_trailing_stop": {
         "icon": "🎯",
@@ -87,21 +67,6 @@ TS_INFO = {
         "label": "Jarak Trailing (%)",
         "min": 0.1, "max": 10.0, "step": 0.1,
         "help": "Jarak stop loss dari harga tertinggi setelah trailing aktif.",
-    },
-}
-
-PROTECTION_INFO = {
-    "max_stoploss": {
-        "icon": "🛑",
-        "label": "Max Stoploss Hits",
-        "min": 1, "max": 20, "step": 1,
-        "help": "Jumlah stoploss maksimal dlm jendela waktu sebelum trading dihentikan. Scalping M1: 5–8 (frekuensi 10+ trade/jam). Default 5 — kompromi safety vs false trigger.",
-    },
-    "stoploss_window_hours": {
-        "icon": "⏱️",
-        "label": "Jendela Waktu (jam)",
-        "min": 1, "max": 72, "step": 1,
-        "help": "Jendela waktu (jam) untuk menghitung jumlah stoploss. 1 jam artinya maksimal 3 stoploss per jam.",
     },
 }
 
@@ -135,6 +100,44 @@ REGIME_INFO = {
         "label": "Volatility Threshold",
         "min": 0.001, "max": 0.05, "step": 0.001, "format": "%.3f",
         "help": "Batas volatilitas utk membedakan ranging vs choppy. M1-M15 noise tinggi — 0.005 (0.5%) mengurangi false choppy. Di atas threshold = choppy, di bawah = ranging.",
+    },
+}
+
+DCA_INFO = {
+    "enabled": {
+        "icon": "🔄",
+        "label": "Aktifkan DCA",
+        "help": "Dollar-Cost Averaging — menambah posisi saat harga bergerak berlawanan untuk meratakan harga entry.",
+    },
+    "max_dca_orders": {
+        "icon": "📊",
+        "label": "Max DCA Orders",
+        "min": 1, "max": 10, "step": 1,
+        "help": "Maksimal jumlah DCA per posisi. Scalping M1: 2-3 cukup. Makin banyak makin berisiko.",
+    },
+    "dca_trigger_pct": {
+        "icon": "📉",
+        "label": "Trigger DCA (%)",
+        "min": -10.0, "max": -0.1, "step": 0.1,
+        "help": "Kerugian % yang memicu DCA. -1.0 artinya harga turun 1% dari entry baru DCA aktif.",
+    },
+    "dca_cooldown_minutes": {
+        "icon": "⏳",
+        "label": "Cooldown DCA (menit)",
+        "min": 1, "max": 120, "step": 1,
+        "help": "Jeda antar DCA untuk posisi yang sama. M1: 3-5 menit agar tidak keburu entry lagi.",
+    },
+    "dca_increment_factor": {
+        "icon": "📈",
+        "label": "Faktor Increment",
+        "min": 1.0, "max": 5.0, "step": 0.1,
+        "help": "Kelipatan volume tiap level DCA. 1.5x: lot ke-2 = 1.5x lot awal. Makin besar makin agresif.",
+    },
+    "dca_position_limit_pct": {
+        "icon": "⚠️",
+        "label": "Limit Posisi (%)",
+        "min": 1.0, "max": 50.0, "step": 1.0,
+        "help": "Batas maksimal total exposure posisi dari balance. 20% artinya total posisi tidak boleh > 20% saldo.",
     },
 }
 
@@ -176,15 +179,6 @@ def _render_section(config, section: str, info_map: dict, keys: list) -> bool:
         if key in info_map:
             with cols[i % 2]:
                 edited |= _render_card(config, section, key, info_map[key])
-    return edited
-
-
-def _render_circuit_breaker(config) -> bool:
-    st.markdown("### 🛡️ Circuit Breaker")
-    st.caption("Melindungi saldo dari kerugian cepat dengan menghentikan trading otomatis.")
-    keys = ["circuit_breaker_enabled", "circuit_breaker_loss_pct",
-            "circuit_breaker_cooldown_minutes"]
-    edited = _render_section(config, "risk_management", CB_INFO, keys)
     return edited
 
 
@@ -258,30 +252,37 @@ def _render_roi(config) -> bool:
     return edited
 
 
-def _render_stoploss_guard(config) -> bool:
+def _render_dca(config) -> bool:
     edited = False
-    st.markdown("---")
-    st.markdown("### 🛡️ Stoploss Guard")
-    st.caption("Batasi jumlah stoploss dalam jendela waktu tertentu. Jika terlampaui, trading otomatis berhenti.")
+    st.markdown("### 🔄 Dollar-Cost Averaging")
+    st.caption("Strategi menambah posisi saat harga bergerak berlawanan untuk menurunkan harga rata-rata entry. Cocok untuk market ranging, tapi berisiko tinggi di trend kuat.")
 
-    cols = st.columns(2)
-    with cols[0]:
-        edited |= _render_card(config, "protection", "max_stoploss", PROTECTION_INFO["max_stoploss"])
-    with cols[1]:
-        edited |= _render_card(config, "protection", "stoploss_window_hours", PROTECTION_INFO["stoploss_window_hours"])
+    edited |= _render_card(config, "dca", "enabled", DCA_INFO["enabled"])
 
-    max_sl = config.get("protection", "max_stoploss")
-    win_h = config.get("protection", "stoploss_window_hours")
-    st.markdown(
-        f"""
-        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-             border-radius: 10px; padding: 0.8rem 1rem; margin-top: 0.5rem; font-size: 0.82rem; line-height: 1.6;">
-            <div style="opacity: 0.8;">💡 <b>Efek saat ini:</b> Trading akan berhenti setelah <b>{max_sl}x stoploss</b>
-            dalam <b>{win_h} jam</b>. Reset otomatis setelah jendela waktu lewat.</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if config.get("dca", "enabled"):
+        dca_keys = [
+            "max_dca_orders", "dca_trigger_pct", "dca_cooldown_minutes",
+            "dca_increment_factor", "dca_position_limit_pct",
+        ]
+        cols = st.columns(2)
+        for i, k in enumerate(dca_keys):
+            with cols[i % 2]:
+                edited |= _render_card(config, "dca", k, DCA_INFO[k])
+
+        st.markdown(
+            '<div style="background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.15);'
+            '     border-radius: 12px; padding: 1rem; margin-top: 0.5rem; font-size: 0.85rem; line-height: 1.8;">'
+            '<div style="opacity: 0.8;">📌 <b>Entry</b> — 0.10 lot @ $2000</div>'
+            '<div style="opacity: 0.8;">📉 <b>DCA #1</b> — +0.15 lot @ $1980 (harga turun 1%)</div>'
+            '<div style="opacity: 0.7;">📉 <b>DCA #2</b> — +0.23 lot @ $1960</div>'
+            '<div style="opacity: 0.6;">📉 <b>DCA #3</b> — +0.34 lot @ $1940</div>'
+            '<div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; opacity: 0.9;">'
+            "🎯 <b>Total:</b> 0.82 lot | <b>Rata-rata:</b> ~$1965 | <b>Profit di:</b> $1975 (+0.5%)"
+            "</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
     return edited
 
 
@@ -317,7 +318,7 @@ def render(config) -> bool:
         textwrap.dedent("""
         <div class="info-banner">
             <div class="title">🛡️ Manajemen Risiko & Proteksi</div>
-            <div class="desc">Atur parameter risiko, circuit breaker, trailing stop, ROI take-profit, dan stoploss guard. Semua nilai disesuaikan untuk scalping timeframe M1–M15.</div>
+            <div class="desc">Atur parameter risiko, circuit breaker, trailing stop, ROI take-profit, DCA, dan stoploss guard. Semua nilai disesuaikan untuk scalping timeframe M1–M15.</div>
         </div>
         """),
         unsafe_allow_html=True,
@@ -325,13 +326,11 @@ def render(config) -> bool:
 
     edited |= _render_risk_params(config)
     st.markdown("---")
-    edited |= _render_circuit_breaker(config)
-    st.markdown("---")
     edited |= _render_trailing_stop(config)
     st.markdown("---")
     edited |= _render_roi(config)
-    edited |= _render_stoploss_guard(config)
-
+    st.markdown("---")
+    edited |= _render_dca(config)
     st.markdown("---")
     edited |= _render_regime_detection(config)
 

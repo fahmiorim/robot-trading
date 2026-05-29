@@ -74,11 +74,13 @@ def main(auto_trade_override: bool = False):
         use_agent = config.get("signals", "use_agent")
         use_swarm = config.get("signals", "use_swarm")
 
+        # Gunakan raw signals per source (bukan consensus voting)
+        raw_signals = robot.get_individual_signals(data)
         signals = {
-            'strategy': robot.get_signal(data),
-            'ml': robot.get_signal(data, use_ml=True) if use_ml else 0,
-            'agent': robot.get_signal(data, use_agent=True) if use_agent else 0,
-            'swarm': robot.get_signal(data, use_swarm=True) if use_swarm else 0
+            'strategy': raw_signals.get('strategy', 0),
+            'ml': raw_signals.get('ml', 0) if use_ml else 0,
+            'agent': raw_signals.get('agent', 0) if use_agent else 0,
+            'swarm': raw_signals.get('swarm', 0) if use_swarm else 0
         }
         for name, sig in signals.items():
             label = "BUY" if sig == 1 else "SELL" if sig == -1 else "HOLD"

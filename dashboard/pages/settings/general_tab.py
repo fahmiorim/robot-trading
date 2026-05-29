@@ -3,6 +3,7 @@ import textwrap
 
 from dashboard.helpers import get_available_symbols
 from src.configuration import TIMEFRAME_MAP
+from src.constants.timeframes import TIMEFRAME_MINUTES, TIMEFRAME_DISPLAY
 from src.constants.mt5 import TRADE_MODE_LABELS
 from src.exchange.helpers import get_symbol_trade_info
 
@@ -23,8 +24,22 @@ def render(config) -> bool:
         else:
             sym = st.text_input("Symbol", value=current_sym)
         if sym != current_sym:
+            # Before switching, save previous symbol's per-symbol values to context
+            prev_tf = config.get("general", "timeframe")
+            
+            # Update symbol and switch context to new symbol
             config.set("general", "symbol", sym)
+            config.set_context(sym, prev_tf)
             edited = True
+
+            # ── Auto-load per-symbol defaults ──────────────
+            # The new context resolves (symbol, TF) → (None, TF) → (symbol, None) → (None, None)
+            # If the per-symbol+TF override exists in DB, it's already loaded.
+            # For params without override, the global/TF default is used.
+            
+            # Show toast with loaded symbol context
+            sym_ctx = config.context_symbol or "GLOBAL"
+            st.toast(f"\U0001f3af Context switched to **{sym_ctx}** — per-symbol defaults loaded", icon="\U0001f504")
 
         # Trade Mode indicator (live from MT5)
         _cfg_trade_mode = None
@@ -65,15 +80,30 @@ def render(config) -> bool:
         tf_options = list(TIMEFRAME_MAP.keys())
         current_tf = config.get("general", "timeframe")
         tf_idx = tf_options.index(current_tf) if current_tf in tf_options else 0
-        tf = st.selectbox("Timeframe", tf_options, index=tf_idx, help="Cycle interval auto-syncs to timeframe (M1=1min, M5=5min, etc.)")
+        tf = st.selectbox(
+            "Timeframe", tf_options,
+            index=tf_idx,
+            format_func=lambda x: TIMEFRAME_DISPLAY.get(x, x),
+            help="Cycle interval auto-syncs to timeframe. Kelompok: ⚡ Scalping, 📊 Day Trading, 📈 Swing Trading, 🎯 Position Trading."
+        )
         if tf != current_tf:
             config.set("general", "timeframe", tf)
-            tf_minutes = TIMEFRAME_MAP.get(tf, 15)
+            tf_minutes = TIMEFRAME_MINUTES.get(tf, 15)
             config.set("general", "cycle_interval_minutes", tf_minutes)
+            config.set_context(config.get("general", "symbol"), tf)
             edited = True
 
-        ci = TIMEFRAME_MAP.get(tf, 15)
-        st.caption(f"\u23f1\ufe0f Cycle interval: **{ci} min** (auto)")
+        ci = TIMEFRAME_MINUTES.get(tf, 15)
+        # Format display for larger timeframes
+        if ci >= 43200:
+            ci_display = f"{ci // 43200} bulan ({ci // 10080} minggu)"
+        elif ci >= 10080:
+            ci_display = f"{ci // 10080} minggu ({ci // 1440} hari)"
+        elif ci >= 1440:
+            ci_display = f"{ci // 1440} hari ({ci} menit)"
+        else:
+            ci_display = f"{ci} menit"
+        st.caption(f"\u23f1\ufe0f Cycle interval: **{ci_display}** ({ci} menit)")
 
     col1, col2 = st.columns(2)
     with col1:

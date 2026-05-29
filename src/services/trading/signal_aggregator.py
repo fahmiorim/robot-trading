@@ -59,14 +59,20 @@ class SignalAggregator:
         """Swarm intelligence — votes from ML model + all strategies."""
         try:
             from src.ml.model import MLModel
+            from src.configuration.manager import ConfigManager
             import os
 
             if not hasattr(self, "_swarm_model"):
-                self._swarm_model = MLModel()
-                self._swarm_model.load("trained_models/latest_model.pkl")
-                
+                self._swarm_model = MLModel(config=ConfigManager())
+
             model = self._swarm_model
-            model_path = "trained_models/latest_model.pkl"
+            # Dynamically resolve model path from config
+            try:
+                sym = model.config.get("general", "symbol")
+                tf = model.config.get("general", "timeframe")
+            except Exception:
+                sym, tf = "XAUUSD", "TIMEFRAME_M15"
+            model_path = MLModel.get_default_model_path(sym, tf)
             
             # Reload from disk if the file has changed
             if os.path.exists(model_path):

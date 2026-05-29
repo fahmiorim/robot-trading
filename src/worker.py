@@ -73,6 +73,18 @@ class Worker:
         """Main worker loop."""
         logger.info("Worker loop started")
 
+        # ── Establish DB connection once for this thread ────────
+        # DatabaseManager uses threading.local(), so each thread
+        # gets its own connection.  By calling connect() here we
+        # ensure the connection is ready *before* the first cycle,
+        # and the "MySQL connection established" log appears only
+        # once at worker startup.
+        try:
+            from src.persistence.database import get_db
+            get_db().connect()
+        except Exception:
+            pass
+
         while not self._stop_event.is_set():
             cycle_start = time.time()
             try:

@@ -27,6 +27,7 @@ from src.services.signal_service import SignalService
 from src.services.strategy_service import StrategyService
 from src.services.trade_execution_service import TradeExecutionService
 from src.services.ml_service import MLService
+from src.ml.model import MLModel
 from src.services.risk_service import RiskService
 from src.services.system_service import SystemService
 from src.services.notification_service import NotificationService
@@ -57,6 +58,9 @@ class TradingController:
 
         self.symbol = self.config.get("general", "symbol")
         self.timeframe = self.config.get("general", "timeframe")
+
+        # Sync config context to current symbol/timeframe
+        self.config.set_context(self.symbol, self.timeframe)
 
         # ── Trading Mode ──
         mode = self.config.get("trading", "mode")
@@ -105,10 +109,13 @@ class TradingController:
             self.config, self.exchange, self.order_manager,
             self.trade_manager, None,  # rpc set later
         )
+        # Generate dynamic model path: trained_models/{symbol}_{timeframe}.pkl
+        model_path = MLModel.get_default_model_path(self.symbol, self.timeframe)
+
         self.ml_service = MLService(
             model_type=self.config.get("ml", "model_type"),
             retrain_interval_hours=self.config.get("ml", "retrain_interval_hours"),
-            model_path=self.config.get("ml", "model_path"),
+            model_path=model_path,
             config=self.config,
         )
         self.risk_service = RiskService(self.config, self.risk_manager, self.protection_manager, self.analytics_repo)
@@ -193,6 +200,20 @@ class TradingController:
             config=self.config,
         )
         return sig
+
+    def get_individual_signals(self, data: pd.DataFrame) -> Dict[str, int]:
+        """Get raw signals from each source individually (no consensus).
+
+        Returns dict: {"strategy": int, "ml": int, "agent": int, "swarm": int}
+        Each value: 1=BUY, -1=SELL, 0=HOLD
+        """
+        return self.signal_service.get_individual_signals(
+            data=data,
+            strategies=self.strategies,
+            best_strategy=self.strategy_service.best_strategy,
+            ml_trainer=self.ml_service.trainer,
+            config=self.config,
+        )
 
     # ── Trade Execution ──
 

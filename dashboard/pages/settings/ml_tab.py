@@ -1,52 +1,10 @@
 """
 ML Settings Tab — premium glass cards with Indonesian descriptions.
+ML model params (model_type, retrain, n_estimators, dll) sudah dipindahkan ke Universal tab.
+Hanya Feature Engineering, Training History, dan Local Training yang tersisa.
 """
 import streamlit as st
 import textwrap
-
-ML_INFO = {
-    "model_type": {
-        "icon": "🧠",
-        "label": "Tipe Model",
-        "help": "Pilih algoritma ML: Gradient Boosting (direkomendasikan — akurasi lebih tinggi untuk M1 scalping) atau Random Forest (serbaguna).",
-    },
-    "retrain_interval_hours": {
-        "icon": "🔄",
-        "label": "Retrain (jam)",
-        "min": 1, "max": 168, "step": 1,
-        "help": "Frekuensi retrain model. Scalping M1-M15: 4 jam. Timeframe tinggi (H1+): 12-24 jam.",
-    },
-    "n_estimators": {
-        "icon": "🌲",
-        "label": "Jumlah Pohon",
-        "min": 10, "max": 500, "step": 10,
-        "help": "Jumlah pohon untuk Random Forest / boosting. Lebih banyak = lebih akurat tapi lebih lambat.",
-    },
-    "max_depth": {
-        "icon": "🌳",
-        "label": "Max Depth",
-        "min": 1, "max": 50, "step": 1,
-        "help": "Kedalaman maksimum pohon. 3 untuk GradientBoosting M1 — lebih generalize. 5-10 untuk Random Forest. None = unlimited (risiko overfit).",
-    },
-    "min_samples_split": {
-        "icon": "🧩",
-        "label": "Min Split",
-        "min": 2, "max": 50, "step": 1,
-        "help": "Jumlah sampel minimal untuk membelah node. M1 noise tinggi — 5 lebih aman dari overfit dibanding 2. Range 5-10 rekomendasi scalping.",
-    },
-    "classification_threshold": {
-        "icon": "🎯",
-        "label": "Min Threshold",
-        "min": 0.0, "max": 0.02, "step": 0.0001, "format": "%.4f",
-        "help": "Batas minimum return untuk label Buy/Sell. Set 0.0 agar threshold ATR-adaptif bekerja penuh — threshold otomatis = ATR% × atr_mult. Distribusi kelas jadi ~35-40% HOLD, ideal untuk M1.",
-    },
-    "atr_multiplier": {
-        "icon": "📐",
-        "label": "ATR Multiplier",
-        "min": 0.05, "max": 2.0, "step": 0.05, "format": "%.2f",
-        "help": "Proporsi ATR untuk threshold adaptif. M1-M15 semakin kecil = lebih banyak sinyal. 0.20 = 20% ATR — optimal untuk scalping.",
-    },
-}
 
 FEATURES_INFO = {
     "returns_period_1": {
@@ -117,9 +75,55 @@ FEATURES_INFO = {
     },
 }
 
+ML_MODEL_INFO = {
+    "model_type": {
+        "icon": "🧠",
+        "label": "Tipe Model",
+        "help": "gradient_boosting (rekomendasi) atau random_forest.",
+    },
+    "retrain_interval_hours": {
+        "icon": "🔄",
+        "label": "Retrain (jam)",
+        "min": 1, "max": 168, "step": 1,
+        "help": "Frekuensi retrain model ML.",
+    },
+    "n_estimators": {
+        "icon": "🌲",
+        "label": "Jumlah Pohon",
+        "min": 10, "max": 500, "step": 10,
+        "help": "Jumlah pohon untuk Random Forest / boosting.",
+    },
+    "max_depth": {
+        "icon": "🌳",
+        "label": "Max Depth",
+        "min": 1, "max": 50, "step": 1,
+        "help": "Kedalaman maksimum pohon. 3-5 untuk generalize.",
+    },
+    "min_samples_split": {
+        "icon": "🧩",
+        "label": "Min Split",
+        "min": 2, "max": 50, "step": 1,
+        "help": "Sampel minimal untuk membelah node. 5-10 untuk M1.",
+    },
+    "classification_threshold": {
+        "icon": "🎯",
+        "label": "Min Threshold",
+        "min": 0.0, "max": 0.02, "step": 0.0001, "format": "%.4f",
+        "help": "Batas return minimum untuk label Buy/Sell.",
+    },
+    "atr_multiplier": {
+        "icon": "📐",
+        "label": "ATR Multiplier",
+        "min": 0.05, "max": 2.0, "step": 0.05, "format": "%.2f",
+        "help": "Proporsi ATR untuk threshold adaptif.",
+    },
+}
 
-def _render_card(config, section: str, key: str, info: dict) -> bool:
-    """Compact parameter card: description on left, input on right."""
+
+def _render_ml_card(config, section: str, key: str, info: dict) -> bool:
+    """Render an ML model parameter card.
+    Uses ``config.set_global()`` so changes always save as global defaults.
+    """
     edited = False
     v = config.get(section, key)
     is_int = info.get("min") is not None and isinstance(info["min"], int)
@@ -134,11 +138,66 @@ def _render_card(config, section: str, key: str, info: dict) -> bool:
             if key == "model_type":
                 opts = ["random_forest", "gradient_boosting"]
                 idx = opts.index(v) if v in opts else 0
-                nv = st.selectbox(info["label"], opts, idx, key=f"{section}_{key}", label_visibility="collapsed")
-                if nv != v:
-                    config.set(section, key, nv)
-                    edited = True
+                nv = st.selectbox(info["label"], opts, idx,
+                                  key=f"ml_model_{key}", label_visibility="collapsed")
             elif is_int:
+                nv = st.number_input(info["label"], info["min"], info["max"], int(v),
+                                     int(info.get("step", 1)),
+                                     key=f"ml_model_{key}", label_visibility="collapsed")
+            else:
+                step = info.get("step", 0.001)
+                nv = st.number_input(info["label"], info["min"], info["max"], float(v), step,
+                                     format=fmt, key=f"ml_model_{key}", label_visibility="collapsed")
+        if nv != v:
+            ok = config.set_global(section, key, nv)
+            if ok:
+                edited = True
+            else:
+                st.error(f"❌ Gagal menyimpan {section}.{key} — cek koneksi database.")
+    return edited
+
+
+def _render_ml_model_params(config) -> bool:
+    st.markdown("### 🧠 Model ML")
+    st.caption("Tipe model dan hyperparameter ML — berlaku global di semua context.")
+
+    edited = False
+
+    cols = st.columns(3)
+    ml_keys = ["model_type", "retrain_interval_hours", "n_estimators"]
+    for i, k in enumerate(ml_keys):
+        with cols[i]:
+            edited |= _render_ml_card(config, "ml", k, ML_MODEL_INFO[k])
+
+    cols = st.columns(2)
+    with cols[0]:
+        edited |= _render_ml_card(config, "ml", "max_depth", ML_MODEL_INFO["max_depth"])
+    with cols[1]:
+        edited |= _render_ml_card(config, "ml", "min_samples_split", ML_MODEL_INFO["min_samples_split"])
+
+    cols = st.columns(2)
+    with cols[0]:
+        edited |= _render_ml_card(config, "ml", "classification_threshold", ML_MODEL_INFO["classification_threshold"])
+    with cols[1]:
+        edited |= _render_ml_card(config, "ml", "atr_multiplier", ML_MODEL_INFO["atr_multiplier"])
+
+    return edited
+
+
+def _render_card(config, section: str, key: str, info: dict) -> bool:
+    """Compact parameter card: description on left, input on right."""
+    edited = False
+    v = config.get(section, key)
+    is_int = info.get("min") is not None and isinstance(info["min"], int)
+    fmt = info.get("format", None)
+
+    with st.container(border=True):
+        c1, c2 = st.columns([1.8, 1.2], vertical_alignment="center")
+        with c1:
+            st.markdown(f"**{info['icon']} {info['label']}**")
+            st.caption(info.get("help", ""))
+        with c2:
+            if is_int:
                 nv = st.number_input(info["label"], info["min"], info["max"], int(v), int(info.get("step", 1)),
                                      key=f"{section}_{key}", label_visibility="collapsed")
                 if nv != v:
@@ -418,27 +477,23 @@ def render(config) -> bool:
         textwrap.dedent("""
         <div class="info-banner">
             <div class="title">🧠 Machine Learning</div>
-            <div class="desc">Konfigurasi model ML untuk prediksi arah harga. Parameter otomatis disesuaikan untuk scalping timeframe M1–M15.</div>
+            <div class="desc">
+                Semua konfigurasi ML tersedia di sini — tipe model, hyperparameter,
+                fitur engineering, riwayat training, dan local training.
+            </div>
         </div>
         """),
         unsafe_allow_html=True,
     )
 
-    st.markdown("### 🤖 Model ML")
-    st.caption("Random Forest atau Gradient Boosting — atur arsitektur dan hyperparameter.")
-
-    ml_keys = ["model_type", "retrain_interval_hours", "n_estimators",
-               "max_depth", "min_samples_split",
-               "classification_threshold", "atr_multiplier"]
-    cols = st.columns(2)
-    for i, k in enumerate(ml_keys):
-        with cols[i % 2]:
-            edited |= _render_card(config, "ml", k, ML_INFO[k])
+    # ── Model Parameters ──
+    edited |= _render_ml_model_params(config)
 
     st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
+
+    # ── Training History ──
     st.markdown("### 📈 Riwayat Training")
     st.caption("Visualisasi riwayat training dari database — akurasi, distribusi kelas, dan feature importance evolution.")
-
     _render_training_history(config)
 
     st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
@@ -483,7 +538,7 @@ def render(config) -> bool:
                 edited |= _render_card(config, "features", k, FEATURES_INFO[k])
 
     st.markdown("<hr style='margin:1.6rem 0 0.8rem;'>", unsafe_allow_html=True)
-    
+
     # ── Local Training section wrapped in a card ──
     with st.container(border=True):
         st.markdown("### 🚂 Local Training")
@@ -571,9 +626,8 @@ def render(config) -> bool:
                                             f"Kelas **{class_labels_long.get(max_class, max_class)}** terlalu mendominasi data latih. "
                                             f"Model cenderung mengalami akurasi semu karena hanya menebak kelas mayoritas secara pasif.\n\n"
                                             f"**Solusi:**\n"
-                                            f"1. Turunkan **ATR Multiplier** (pengaturan di atas, misal ke `0.05`–`0.1`) agar threshold adaptif lebih sensitif\n"
-                                            f"2. Turunkan **Min Threshold** ke `0.0` agar ATR adaptif bekerja optimal\n"
-                                            f"3. Gunakan **Timeframe** lebih besar (M15, H1, H4) untuk variasi pergerakan harga lebih baik"
+                                            f"1. Turunkan **ATR Multiplier** di tab Universal untuk threshold lebih sensitif\n"
+                                            f"2. Gunakan **Timeframe** lebih besar (M15, H1, H4) untuk variasi pergerakan harga lebih baik"
                                         )
                                     else:
                                         st.success(

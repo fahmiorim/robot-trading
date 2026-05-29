@@ -3,7 +3,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.configuration.manager import ConfigManager
 from src.ml.model import MLModel
@@ -24,35 +24,28 @@ class SwarmIntelligence:
             'gb_classifier': MLModel('gradient_boosting', config=self.config)
         }
         
+        # Determine symbol for per-symbol model isolation
+        try:
+            self._swarm_symbol = self.config.get("general", "symbol")
+            self._swarm_timeframe = self.config.get("general", "timeframe")
+        except Exception:
+            self._swarm_symbol = "XAUUSD"
+            self._swarm_timeframe = "TIMEFRAME_M15"
+
         # Try to load existing models from disk (only if not already trained)
         os.makedirs("trained_models", exist_ok=True)
         for name, model in self.models.items():
             if not model.is_trained:
-                model.load(f"trained_models/swarm_{name}.pkl")
+                model.load(f"trained_models/{self._swarm_symbol}/swarm_{name}.pkl")
         
-        ma_cfg = self.config.get("strategies", "MA_Crossover")
-        ma_fast = ma_cfg.get("fast_period", 10)
-        ma_slow = ma_cfg.get("slow_period", 25)
-        rsi_cfg = self.config.get("strategies", "RSI")
-        rsi_period = rsi_cfg.get("period", 9)
-        rsi_overbought = rsi_cfg.get("overbought", 80)
-        rsi_oversold = rsi_cfg.get("oversold", 20)
-        macd_cfg = self.config.get("strategies", "MACD")
-        macd_fast = macd_cfg.get("fast", 12)
-        macd_slow = macd_cfg.get("slow", 26)
-        macd_signal = macd_cfg.get("signal", 9)
-        self.strategies = {
-            'ma': MACrossoverStrategy(fast_period=ma_fast, slow_period=ma_slow),
-            'rsi': RSIStrategy(period=rsi_period, overbought=rsi_overbought, oversold=rsi_oversold),
-            'macd': MACDStrategy(fast=macd_fast, slow=macd_slow, signal=macd_signal),
-        }
+        self.strategies = self._build_strategies_from_config()
         self.weights = {k: 1.0 for k in self.models}
         self.weights.update({k: 1.0 for k in self.strategies})
         
         # Track last train times
         self._last_train_times = {}
         for name in self.models:
-            save_path = f"trained_models/swarm_{name}.pkl"
+            save_path = f"trained_models/{self._swarm_symbol}/swarm_{name}.pkl"
             if os.path.exists(save_path):
                 self._last_train_times[name] = os.path.getmtime(save_path)
             else:
@@ -66,7 +59,7 @@ class SwarmIntelligence:
         retrain_interval = retrain_interval_hours * 3600  # seconds
 
         for name, model in self.models.items():
-            save_path = f"trained_models/swarm_{name}.pkl"
+            save_path = f"trained_models/{self._swarm_symbol}/swarm_{name}.pkl"
             last_train = self._last_train_times.get(name, 0)
             
             should_train = force or not model.is_trained or (time.time() - last_train >= retrain_interval)
@@ -77,6 +70,53 @@ class SwarmIntelligence:
                     self._last_train_times[name] = time.time()
                 except Exception as e:
                     logger.warning(f"Swarm model {name} training failed: {e}")
+
+    def _build_strategies_from_config(self) -> Dict[str, Any]:
+        """Build strategy instances from DB config, respecting enabled flags.
+
+        Membaca semua 5 strategi dari database dan hanya mengaktifkan
+        yang memiliki enabled=True. Termasuk Bollinger & Breakout.
+        """
+        strategies = {}
+
+        strategy_configs = [
+            ("MA_Crossover", "ma", lambda cfg: MACrossoverStrategy(
+                fast_period=cfg.get("fast_period", 10),
+                slow_period=cfg.get("slow_period", 25),
+            )),
+            ("RSI", "rsi", lambda cfg: RSIStrategy(
+                period=cfg.get("period", 14),
+                overbought=cfg.get("overbought", 70),
+                oversold=cfg.get("oversold", 30),
+            )),
+            ("MACD", "macd", lambda cfg: MACDStrategy(
+                fast=cfg.get("fast", 12),
+                slow=cfg.get("slow", 26),
+                signal=cfg.get("signal", 9),
+            )),
+            ("Bollinger", "bollinger", lambda cfg: BollingerStrategy(
+                period=cfg.get("period", 20),
+                std_dev=cfg.get("std_dev", 2.0),
+            )),
+            ("Breakout", "breakout", lambda cfg: BreakoutStrategy(
+                lookback=cfg.get("lookback", 20),
+            )),
+        ]
+
+        for db_name, short_name, factory in strategy_configs:
+            try:
+                cfg = self.config.get("strategies", db_name)
+                if not isinstance(cfg, dict):
+                    cfg = {}
+                enabled = cfg.get("enabled", True)
+                if not enabled:
+                    logger.debug(f"Swarm skipping disabled strategy: {db_name}")
+                    continue
+                strategies[short_name] = factory(cfg)
+            except Exception as e:
+                logger.warning(f"Swarm failed to load strategy {db_name}: {e}")
+
+        return strategies
 
     def get_predictions(self, data: pd.DataFrame) -> Dict[str, int]:
         predictions = {}
@@ -90,23 +130,7 @@ class SwarmIntelligence:
         
         # Recreate strategies dynamically in case periods changed in the DB config
         try:
-            ma_cfg = self.config.get("strategies", "MA_Crossover")
-            ma_fast = ma_cfg.get("fast_period", 10)
-            ma_slow = ma_cfg.get("slow_period", 25)
-            rsi_cfg = self.config.get("strategies", "RSI")
-            rsi_period = rsi_cfg.get("period", 9)
-            rsi_overbought = rsi_cfg.get("overbought", 80)
-            rsi_oversold = rsi_cfg.get("oversold", 20)
-            macd_cfg = self.config.get("strategies", "MACD")
-            macd_fast = macd_cfg.get("fast", 12)
-            macd_slow = macd_cfg.get("slow", 26)
-            macd_signal = macd_cfg.get("signal", 9)
-            
-            self.strategies = {
-                'ma': MACrossoverStrategy(fast_period=ma_fast, slow_period=ma_slow),
-                'rsi': RSIStrategy(period=rsi_period, overbought=rsi_overbought, oversold=rsi_oversold),
-                'macd': MACDStrategy(fast=macd_fast, slow=macd_slow, signal=macd_signal),
-            }
+            self.strategies = self._build_strategies_from_config()
         except Exception as e:
             logger.warning(f"Failed to refresh Swarm strategies from config: {e}")
 
@@ -122,13 +146,19 @@ class SwarmIntelligence:
         predictions = self.get_predictions(data)
         if not predictions:
             return 0
-        weighted_sum = sum(p * self.weights.get(k, 1.0) for k, p in predictions.items())
-        avg = weighted_sum / len(predictions)
+        # Majority voting: hitung berapa sumber setuju BUY / SELL
+        buy_votes = sum(1 for p in predictions.values() if p == 1)
+        sell_votes = sum(1 for p in predictions.values() if p == -1)
+        total = len(predictions)
+        if total == 0:
+            return 0
+        buy_ratio = buy_votes / total
+        sell_ratio = sell_votes / total
         buy_threshold = self.config.get("signals", "consensus_buy_threshold")
         sell_threshold = self.config.get("signals", "consensus_sell_threshold")
-        if avg > buy_threshold:
+        if buy_ratio >= buy_threshold:
             return 1
-        elif avg < sell_threshold:
+        elif sell_ratio >= abs(sell_threshold):
             return -1
         return 0
 

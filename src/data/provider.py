@@ -188,6 +188,6 @@ class DataProvider:
         return f"{self.symbol}_{self.timeframe}_{count}"
 
     def _timeframe_seconds(self) -> int:
-        from src.constants import TIMEFRAME_MAP
-        minutes = TIMEFRAME_MAP.get(self.timeframe, 15)
+        from src.constants import TIMEFRAME_MINUTES
+        minutes = TIMEFRAME_MINUTES.get(self.timeframe, 15)
         return minutes * 60

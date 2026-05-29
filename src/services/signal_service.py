@@ -85,6 +85,44 @@ class SignalService:
             return SignalType.SELL
         return SignalType.HOLD
 
+    def get_individual_signals(self, data: pd.DataFrame, strategies: Dict,
+                                 best_strategy: Any = None,
+                                 ml_trainer: Any = None,
+                                 config: Optional[Any] = None) -> Dict[str, int]:
+        """Get raw signals from each source individually (no consensus).
+
+        Returns dict with keys: strategy, ml, agent, swarm
+        Each value is 1 (BUY), -1 (SELL), or 0 (HOLD).
+        """
+        signals = {}
+
+        # 1. Strategy signal (always available)
+        signals["strategy"] = self._strategy_signal(data, strategies, best_strategy)
+
+        # 2. ML signal
+        if ml_trainer is not None and hasattr(ml_trainer, 'predict'):
+            try:
+                ml_sig = self._ml_signal(data, ml_trainer)
+                signals["ml"] = ml_sig
+            except Exception:
+                signals["ml"] = SignalType.HOLD
+        else:
+            signals["ml"] = SignalType.HOLD
+
+        # 3. Agent signal
+        try:
+            signals["agent"] = self._agent_signal(data, config)
+        except Exception:
+            signals["agent"] = SignalType.HOLD
+
+        # 4. Swarm signal
+        try:
+            signals["swarm"] = self._swarm_signal(data, config)
+        except Exception:
+            signals["swarm"] = SignalType.HOLD
+
+        return signals
+
     def get_last_signals(self) -> Dict[str, int]:
         return dict(self._last_signals)
 

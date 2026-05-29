@@ -250,20 +250,41 @@ class MLModel:
 
     # ── Persistence ───────────────────────────────────────────
 
+    @staticmethod
+    def get_default_model_path(symbol: str, timeframe: str) -> str:
+        """Generate model file path from symbol and timeframe.
+
+        E.g. ``"XAUUSD_TIMEFRAME_M15.pkl"`` → ``trained_models/XAUUSD_TIMEFRAME_M15.pkl``"""
+        import os
+        os.makedirs("trained_models", exist_ok=True)
+        return f"trained_models/{symbol}_{timeframe}.pkl"
+
     def save(self, filepath: str) -> None:
+        symbol = self.config.get("general", "symbol")
         timeframe = self.config.get("general", "timeframe")
         joblib.dump({
             "model": self.model,
             "scaler": self.scaler,
-            "timeframe": timeframe
+            "symbol": symbol,
+            "timeframe": timeframe,
         }, filepath)
-        logger.info(f"ML model saved to {filepath} with timeframe {timeframe}")
+        logger.info(f"ML model saved to {filepath} (symbol={symbol}, timeframe={timeframe})")
 
     def load(self, filepath: str) -> bool:
         """Load model from disk. Returns True on success."""
         try:
             loaded = joblib.load(filepath)
             
+            # Validate symbol if stored in model file
+            symbol_in_file = loaded.get("symbol")
+            current_symbol = self.config.get("general", "symbol")
+            if symbol_in_file and symbol_in_file != current_symbol:
+                logger.warning(
+                    f"ML model symbol mismatch: file has {symbol_in_file}, "
+                    f"but config has {current_symbol}. Forcing retrain."
+                )
+                return False
+
             # Validate timeframe if stored in model file
             timeframe_in_file = loaded.get("timeframe")
             current_timeframe = self.config.get("general", "timeframe")
@@ -289,7 +310,7 @@ class MLModel:
             self.model = loaded["model"]
             self.scaler = scaler
             self.is_trained = True
-            logger.info(f"ML model loaded from {filepath} (timeframe={timeframe_in_file or 'legacy'})")
+            logger.info(f"ML model loaded from {filepath} (symbol={symbol_in_file or 'legacy'}, timeframe={timeframe_in_file or 'legacy'})")
             return True
         except Exception as e:
             logger.warning(f"Failed to load ML model from {filepath}: {e}")

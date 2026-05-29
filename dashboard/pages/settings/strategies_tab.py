@@ -20,7 +20,7 @@ STRATEGY_INFO = {
         "params": {
             "period": {"label": "RSI Period", "min": 7, "max": 21, "step": 1, "help": "Jumlah candle untuk kalkulasi RSI"},
             "overbought": {"label": "Overbought Level", "min": 60, "max": 85, "step": 1, "help": "RSI di atas ini = overbought, trigger Sell"},
-            "oversold": {"label": "Oversold Level", "min": 15, "max": 40, "step": 1, "help": "RSI di bawah ini = oversold, trigger Buy"},
+            "oversold": {"label": "Oversold Level", "min": 10, "max": 40, "step": 1, "help": "RSI di bawah ini = oversold, trigger Buy"},
         },
     },
     "MACD": {
@@ -37,7 +37,7 @@ STRATEGY_INFO = {
         "desc": "Buy saat harga menyentuh lower band, Sell saat upper band.",
         "params": {
             "period": {"label": "Bollinger Period", "min": 10, "max": 30, "step": 1, "help": "Periode lookback SMA & std dev"},
-            "std_dev": {"label": "Std Deviation", "min": 1.5, "max": 3.0, "step": 0.1, "help": "Jumlah standar deviasi untuk bands"},
+            "std_dev": {"label": "Std Deviation", "min": 1.5, "max": 4.0, "step": 0.1, "help": "Jumlah standar deviasi untuk bands"},
         },
     },
     "Breakout": {

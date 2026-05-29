@@ -1,0 +1,132 @@
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+    html, body { font-family: 'Outfit', sans-serif; color: #e2e8f0; margin: 0; padding: 0; background: transparent; }
+    body { background: transparent !important; }
+</style>
+<div id="rt-controls-root" style="font-family: 'Outfit', sans-serif; display: flex; flex-direction: column; gap: 8px; padding: 0; background: transparent; overflow: hidden; margin: 0; box-sizing: border-box; height: 100%;">
+    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 8px; margin-top: 4px;">
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">STATUS</div>
+            <div id="rt-ctrl-status" style="font-size: 0.85rem; font-weight: 800; color: #9ca3af;">⚪ OFF</div>
+        </div>
+        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">CYCLES</div>
+            <div id="rt-ctrl-cycles" style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">0</div>
+        </div>
+        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">LAST CYCLE</div>
+            <div id="rt-ctrl-last-cycle" style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">—</div>
+        </div>
+        <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+        <div style="flex: 1; text-align: center;">
+            <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">INTERVAL</div>
+            <div id="rt-ctrl-interval" style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc;">15 min</div>
+        </div>
+    </div>
+
+    <div id="rt-ctrl-caption" style="font-size: 0.72rem; opacity: 0.5; margin-bottom: 8px; font-weight: 500; display: none; color: #ffffff; text-align: center;">
+        Auto trading active — do not close this page!
+    </div>
+
+    <button id="rt-ctrl-btn" style="width: 100%; border: none; padding: 12px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: #ffffff; background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+        ▶️ START AUTO TRADING
+    </button>
+</div>
+
+<script>
+(function(){
+    // Read WS port from query param, fallback to default 8765
+    const params = new URLSearchParams(window.location.search);
+    const port = params.get('ws_port') || '8765';
+    let ws = null;
+    let reconnectTimer = null;
+    let isRunning = false;
+    let lastCycleTimestamp = 0;
+    let cycleInterval = 15;
+
+    setInterval(function(){
+        if (isRunning && lastCycleTimestamp > 0) {
+            const secAgo = Math.floor(Date.now() / 1000 - lastCycleTimestamp);
+            let str = '';
+            if (secAgo < 60) { str = secAgo + 's ago'; }
+            else if (secAgo < 3600) { str = Math.floor(secAgo / 60) + 'm ago'; }
+            else { str = Math.floor(secAgo / 3600) + 'h ago'; }
+            document.getElementById('rt-ctrl-last-cycle').textContent = str;
+        } else if (!isRunning) {
+            document.getElementById('rt-ctrl-last-cycle').textContent = '—';
+        }
+    }, 1000);
+
+    document.getElementById('rt-ctrl-btn').onclick = function(){
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert("WebSocket is not connected!");
+            return;
+        }
+        var btn = this;
+        btn.disabled = true;
+        btn.style.opacity = "0.6";
+        if (isRunning) {
+            ws.send(JSON.stringify({action: "stop_auto_trade"}));
+        } else {
+            ws.send(JSON.stringify({action: "start_auto_trade"}));
+        }
+    };
+
+    function connect(){
+        try {
+            let host = window.location.hostname;
+            if (!host || host === "null" || host === "") host = "localhost";
+            ws = new WebSocket('ws://' + host + ':' + port);
+            ws.onmessage = function(e){
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d.type === "action_result") {
+                        var btn = document.getElementById('rt-ctrl-btn');
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                        if (!d.success) alert(d.message);
+                        return;
+                    }
+                    if (d.status) {
+                        isRunning = !!d.status.auto_trading;
+                        var statusEl = document.getElementById('rt-ctrl-status');
+                        statusEl.innerHTML = isRunning ? '🔴 RUNNING' : '⚪ OFF';
+                        statusEl.style.color = isRunning ? '#f87171' : '#9ca3af';
+                        document.getElementById('rt-ctrl-cycles').textContent = d.status.cycles || '0';
+                        var btn = document.getElementById('rt-ctrl-btn');
+                        if (isRunning) {
+                            btn.innerHTML = '⏹ STOP AUTO TRADING';
+                            btn.style.background = 'rgba(239, 68, 68, 0.15)';
+                            btn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                            btn.style.color = '#f87171';
+                            document.getElementById('rt-ctrl-caption').style.display = 'block';
+                        } else {
+                            btn.innerHTML = '▶️ START AUTO TRADING';
+                            btn.style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+                            btn.style.border = 'none';
+                            btn.style.color = '#ffffff';
+                            document.getElementById('rt-ctrl-caption').style.display = 'none';
+                        }
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                        if (d.status.last_cycle_time) {
+                            lastCycleTimestamp = Number(d.status.last_cycle_time);
+                        }
+                    }
+                } catch(err){
+                    console.error("WS error:", err);
+                }
+            };
+            ws.onclose = function(){ reconnectTimer = setTimeout(connect, 2000); };
+        } catch(err){
+            console.error("WS connect error:", err);
+            reconnectTimer = setTimeout(connect, 3000);
+        }
+    }
+
+    if(typeof WebSocket !== 'undefined') connect();
+})();
+</script>

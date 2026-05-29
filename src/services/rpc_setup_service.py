@@ -14,8 +14,9 @@ from typing import Any, Optional
 from src.configuration.manager import ConfigManager
 from src.rpc.base import RPCManager
 from src.rpc.telegram import TelegramRPC
-from src.rpc.websocket import WebSocketRPC, start_data_pusher
+from src.rpc.websocket import WebSocketRPC, start_data_pusher, set_shared
 from src.rpc.rest_api import RestAPI
+from src.rpc.static_server import StaticFileServer
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +36,7 @@ class RPCSetupService:
         self.config = config
         self.rpc = rpc_manager
         self.ws: Optional[WebSocketRPC] = None
+        self.static_server: Optional[StaticFileServer] = None
         self.rest_api: Optional[RestAPI] = None
 
     def setup_all(self, bot: Any) -> None:
@@ -76,15 +78,24 @@ class RPCSetupService:
     def _setup_websocket(self, bot: Any) -> None:
         """Initialise WebSocket RPC backend and data pusher."""
         ws_cfg = self.config.get("websocket", default={})
+        ws_port = int(ws_cfg.get("port", 8765))
         self.ws = WebSocketRPC(
             host=ws_cfg.get("host", "0.0.0.0"),
-            port=int(ws_cfg.get("port", 8765)),
+            port=ws_port,
         )
         self.ws.bot = bot
+
+        # Start static file HTTP server for dashboard iframes
+        static_port = int(ws_cfg.get("static_port", 8767))
+        self.static_server = StaticFileServer(port=static_port)
+        self.static_server.start()
+        set_shared("static_port", self.static_server.port)
+
         start_data_pusher(self.ws, bot, self.config)
         self.ws.start()
         self.rpc.register(self.ws)
-        logger.info("WebSocket RPC started on ws://localhost:8765")
+        logger.info(f"WebSocket RPC started on ws://localhost:{ws_port}")
+        logger.info(f"Dashboard static files on http://localhost:{self.static_server.port}")
 
     def _setup_rest_api(self, bot: Any) -> None:
         """Initialise REST API server (optional)."""
@@ -108,6 +119,11 @@ class RPCSetupService:
         if self.rest_api:
             try:
                 self.rest_api.stop()
+            except Exception:
+                pass
+        if self.static_server:
+            try:
+                self.static_server.stop()
             except Exception:
                 pass
         if self.ws:

@@ -337,12 +337,14 @@ class DatabaseManager(
             CREATE TABLE IF NOT EXISTS settings (
                 section     VARCHAR(50) NOT NULL,
                 key_name    VARCHAR(50) NOT NULL,
+                symbol      VARCHAR(20) NOT NULL DEFAULT '' COMMENT ''' = global default',
+                timeframe   VARCHAR(30) NOT NULL DEFAULT '' COMMENT ''' = global default',
                 value       TEXT,
                 value_type  VARCHAR(20) NOT NULL DEFAULT 'string',
                 description VARCHAR(255) DEFAULT '',
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (section, key_name)
+                PRIMARY KEY (section, key_name, symbol, timeframe)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """,
     }
@@ -385,6 +387,94 @@ class DatabaseManager(
                     cursor.execute("CREATE INDEX idx_paper_trade ON trade_history (paper_trade)")
             except Exception as e:
                 logger.warning(f"Could not add paper_trade column: {e}")
+
+            # 3. Migrate settings table: symbol/timeframe columns + PK
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = %s
+                      AND TABLE_NAME = 'settings'
+                      AND COLUMN_NAME = 'symbol'
+                """, (db_name,))
+                has_symbol_col = cursor.fetchone()[0] > 0
+
+                if not has_symbol_col:
+                    # Fresh migration: add columns (no existing data)
+                    logger.info("Migrating settings table: adding symbol & timeframe columns...")
+                    cursor.execute("""
+                        ALTER TABLE settings
+                        ADD COLUMN symbol VARCHAR(20) NOT NULL DEFAULT ''
+                            COMMENT ''' = global default' AFTER key_name,
+                        ADD COLUMN timeframe VARCHAR(30) NOT NULL DEFAULT ''
+                            COMMENT ''' = global default' AFTER symbol
+                    """)
+                    cursor.execute("ALTER TABLE settings DROP PRIMARY KEY")
+                    cursor.execute("""
+                        ALTER TABLE settings ADD PRIMARY KEY (section, key_name, symbol, timeframe)
+                    """)
+                    logger.info("Settings table migration complete")
+                else:
+                    # Check if columns are already NOT NULL DEFAULT ''
+                    cursor.execute("""
+                        SELECT IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
+                        WHERE TABLE_SCHEMA = %s
+                          AND TABLE_NAME = 'settings'
+                          AND COLUMN_NAME = 'symbol'
+                    """, (db_name,))
+                    row = cursor.fetchone()
+                    is_still_nullable = (row and row[0] == 'YES')
+
+                    if is_still_nullable:
+                        logger.info("Migrating settings table: NULL -> NOT NULL DEFAULT ''...")
+
+                        # Step A: Delete duplicates, keep 1 row per (section, key_name) for global
+                        cursor.execute("""
+                            DELETE t1 FROM settings t1
+                            INNER JOIN settings t2
+                            WHERE t1.section = t2.section
+                              AND t1.key_name = t2.key_name
+                              AND t1.symbol IS NULL
+                              AND t2.symbol IS NULL
+                              AND t1.timeframe IS NULL
+                              AND t2.timeframe IS NULL
+                              AND t1.created_at < t2.created_at
+                        """)
+                        deleted = cursor.rowcount
+                        if deleted > 0:
+                            logger.info(f"  Removed {deleted} duplicate rows")
+
+                        # Step B: Update NULL -> ''
+                        cursor.execute("""
+                            UPDATE settings SET symbol = '' WHERE symbol IS NULL
+                        """)
+                        cursor.execute("""
+                            UPDATE settings SET timeframe = '' WHERE timeframe IS NULL
+                        """)
+
+                        # Step C: Alter columns to NOT NULL DEFAULT ''
+                        cursor.execute("""
+                            ALTER TABLE settings
+                            MODIFY symbol VARCHAR(20) NOT NULL DEFAULT ''
+                                COMMENT ''' = global default',
+                            MODIFY timeframe VARCHAR(30) NOT NULL DEFAULT ''
+                                COMMENT ''' = global default'
+                        """)
+
+                        # Step D: Drop old PK (may not exist if prev migration dropped it), add new PK
+                        try:
+                            cursor.execute("ALTER TABLE settings DROP PRIMARY KEY")
+                        except Exception:
+                            logger.info("  (no existing PK to drop)")
+                        try:
+                            cursor.execute("""
+                                ALTER TABLE settings ADD PRIMARY KEY (section, key_name, symbol, timeframe)
+                            """)
+                            logger.info("  PRIMARY KEY added")
+                        except Exception as pk_err:
+                            logger.warning(f"  Could not add PK: {pk_err}")
+                        logger.info("Settings table migration complete")
+            except Exception as e:
+                logger.warning(f"Settings table migration failed: {e}")
 
             cursor.close()
             DatabaseManager._tables_ensured = True
