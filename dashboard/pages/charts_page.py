@@ -36,8 +36,7 @@ def render():
 
     # ── Market Controls ──
     with st.container(border=True):
-        st.markdown('', unsafe_allow_html=True)
-        cc = st.columns([2, 2, 2, 1.5])
+        cc = st.columns([2, 2, 2, 1.5], vertical_alignment="bottom")
         with cc[0]:
             symbol = st.text_input("Symbol", value=config.get("general", "symbol"), key="chart_symbol")
             if symbol != config.get("general", "symbol"):
@@ -63,7 +62,6 @@ def render():
                 config.set("general", "data_count", data_count)
                 config.save()
         with cc[3]:
-            st.markdown("<br>", unsafe_allow_html=True)
             fetch_now = st.button("Refresh Data", use_container_width=True, type="primary")
             if fetch_now:
                 with st.spinner("Fetching..."):
@@ -77,18 +75,21 @@ def render():
                     except Exception as e:
                         st.error(f"Fetch error: {e}")
 
-
-
     # ── Price Chart ──
     st.subheader("Price Chart")
     with st.container(border=True):
-        st.markdown('', unsafe_allow_html=True)
         data = st.session_state.get("_last_data")
         if data is not None:
-            candle_opts = [50, 100, 200, 500, 1000, len(data)]
-            candle_labels = ["50", "100", "200", "500", "1000", f"All ({len(data)})"]
-            show_candles = st.selectbox("Candles", options=list(range(len(candle_opts))),
-                                        format_func=lambda i: candle_labels[i], index=2, key="chart_candles")
+            # Compact title and candle selector bar
+            ch_col1, ch_col2 = st.columns([3, 1], vertical_alignment="bottom")
+            with ch_col1:
+                st.markdown("<h4 style='margin:0 0 10px 0; font-size:1.05rem; font-weight:700; color:#a5b4fc;'>📊 Interactive Market Chart</h4>", unsafe_allow_html=True)
+            with ch_col2:
+                candle_opts = [50, 100, 200, 500, 1000, len(data)]
+                candle_labels = ["50", "100", "200", "500", "1000", f"All ({len(data)})"]
+                show_candles = st.selectbox("Candles", options=list(range(len(candle_opts))),
+                                            format_func=lambda i: candle_labels[i], index=2, key="chart_candles")
+            
             limit = candle_opts[show_candles]
             chart_data = data.iloc[-limit:] if limit < len(data) else data
 
@@ -106,55 +107,132 @@ def render():
             fig.add_trace(go.Scatter(x=chart_data.index, y=sma50, name="SMA 50", line=dict(color="#42a5f5", width=1.5)))
             fig.add_trace(go.Bar(x=chart_data.index, y=chart_data[vol_col], name="Volume",
                                  marker_color=colors, opacity=0.4, yaxis="y2", showlegend=False))
-            fig.update_layout(height=500,
-                              xaxis=dict(rangeslider=dict(visible=True, thickness=0.08), type="date"),
-                              yaxis=dict(title="Price ($)", domain=[0.25, 1.0]),
-                              yaxis2=dict(title="Volume", domain=[0.0, 0.2], showgrid=False),
-                              legend=dict(orientation="h", y=1.02, x=0.5, xanchor="center"),
-                              margin=dict(l=50, r=20, t=30, b=50), hovermode="x unified",
-                              template="plotly_dark", dragmode="zoom")
+            fig.update_layout(height=450,
+                              font=dict(family="Outfit, sans-serif", size=11),
+                              xaxis=dict(
+                                  rangeslider=dict(visible=True, thickness=0.06), 
+                                  type="date", 
+                                  gridcolor="rgba(255,255,255,0.04)",
+                                  zerolinecolor="rgba(255,255,255,0.04)"
+                              ),
+                              yaxis=dict(
+                                  title="Price ($)", 
+                                  domain=[0.25, 1.0], 
+                                  gridcolor="rgba(255,255,255,0.04)",
+                                  zerolinecolor="rgba(255,255,255,0.04)"
+                              ),
+                              yaxis2=dict(
+                                  title="Volume", 
+                                  domain=[0.0, 0.2], 
+                                  showgrid=False,
+                                  zerolinecolor="rgba(255,255,255,0.04)"
+                              ),
+                              legend=dict(
+                                  orientation="h", 
+                                  y=1.05, 
+                                  x=0.5, 
+                                  xanchor="center",
+                                  bgcolor="rgba(0,0,0,0)"
+                              ),
+                              margin=dict(l=40, r=10, t=10, b=10), 
+                              hovermode="x unified",
+                              template="plotly_dark", 
+                              dragmode="zoom",
+                              paper_bgcolor="rgba(0,0,0,0)",
+                              plot_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig, use_container_width=True)
 
-            qs = st.columns(5)
+            # Clean HTML/CSS metrics bar
             last_close = chart_data["close"].iloc[-1]
             prev_close = chart_data["close"].iloc[-2]
             change = last_close - prev_close
             chg_pct = change / prev_close * 100
-            with qs[0]:
-                st.metric("Current", f"${last_close:.2f}", delta=f"{change:.2f} ({chg_pct:.2f}%)")
-            with qs[1]:
-                st.metric("Open", f"${chart_data['open'].iloc[-1]:.2f}")
-            with qs[2]:
-                st.metric("High", f"${chart_data['high'].iloc[-1]:.2f}")
-            with qs[3]:
-                st.metric("Low", f"${chart_data['low'].iloc[-1]:.2f}")
-            with qs[4]:
-                vol_val = chart_data["close"].pct_change().std() * 100
-                st.metric("Volatility", f"{vol_val:.3f}%")
+            change_color = "#10b981" if change >= 0 else "#ef4444"
+            change_sign = "+" if change >= 0 else ""
+            open_val = chart_data['open'].iloc[-1]
+            high_val = chart_data['high'].iloc[-1]
+            low_val = chart_data['low'].iloc[-1]
+            vol_val = chart_data["close"].pct_change().std() * 100
+
+            html_metrics = f"""
+            <div style="font-family: 'Outfit', sans-serif; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-top: 10px;">
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">CURRENT</div>
+                    <div style="font-size: 0.85rem; font-weight: 800; color: {change_color};">${last_close:.2f} <span style="font-size: 0.7rem; font-weight: 600; margin-left: 2px;">{change_sign}${change:.2f} ({change_sign}{chg_pct:.2f}%)</span></div>
+                </div>
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">OPEN</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #ffffff;">${open_val:.2f}</div>
+                </div>
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">HIGH</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #10b981;">${high_val:.2f}</div>
+                </div>
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">LOW</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #ef4444;">${low_val:.2f}</div>
+                </div>
+                <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.08);"></div>
+                <div style="flex: 1; text-align: center;">
+                    <div style="font-size: 0.62rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">VOLATILITY</div>
+                    <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc;">{vol_val:.3f}%</div>
+                </div>
+            </div>
+            """
+            st.markdown(html_metrics, unsafe_allow_html=True)
         else:
             st.info("Click 'Refresh Data' to load market data")
 
     # ── Market Analysis ──
     st.subheader("Market Analysis")
     with st.container(border=True):
-        st.markdown('', unsafe_allow_html=True)
         if data is not None:
             ca, cb = st.columns(2)
             with ca:
                 regime = robot.detect_regime(data)
                 robot.current_regime = regime
                 set_shared("regime", regime)
-                colors_map = {"trending": "green", "ranging": "orange", "choppy": "red"}
-                c = colors_map.get(regime.lower(), "gray")
-                st.markdown(f"### Regime: <span style='color:{c}'>{regime.upper()}</span>", unsafe_allow_html=True)
+                
+                # Colors map for Glass Cards
+                colors_text = {"trending": "#10b981", "ranging": "#f59e0b", "choppy": "#ef4444"}
+                colors_bg = {"trending": "rgba(16, 185, 129, 0.06)", "ranging": "rgba(245, 158, 11, 0.06)", "choppy": "rgba(239, 68, 68, 0.06)"}
+                colors_border = {"trending": "rgba(16, 185, 129, 0.18)", "ranging": "rgba(245, 158, 11, 0.18)", "choppy": "rgba(239, 68, 68, 0.18)"}
+                
+                regime_lower = regime.lower()
+                c_text = colors_text.get(regime_lower, "#9ca3af")
+                c_bg = colors_bg.get(regime_lower, "rgba(255, 255, 255, 0.02)")
+                c_border = colors_border.get(regime_lower, "rgba(255, 255, 255, 0.05)")
+                
+                st.markdown(f"""
+                <div style="font-family: 'Outfit', sans-serif; background: {c_bg}; border: 1px solid {c_border}; border-radius: 12px; padding: 1.1rem; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+                    <div style="font-size: 2.2rem;">🔍</div>
+                    <div>
+                        <div style="font-size: 0.65rem; opacity: 0.55; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">MARKET REGIME</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: {c_text}; text-transform: uppercase; margin-top: 2px;">{regime}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 4px; line-height: 1.4;">Detects trending, ranging or choppy market conditions.</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
             with cb:
                 with st.spinner("Running backtest..."):
                     results = robot.run_backtest_all(data)
                     st.session_state.backtest_results = results
                 name = robot.best_strategy.name if robot.best_strategy else "N/A"
                 set_shared("best_strategy", name)
-                st.markdown(f"### Best Strategy: **{name}**")
-
-
+                
+                st.markdown(f"""
+                <div style="font-family: 'Outfit', sans-serif; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 12px; padding: 1.1rem; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.05);">
+                    <div style="font-size: 2.2rem; filter: drop-shadow(0 0 10px rgba(99,102,241,0.25));">🏆</div>
+                    <div>
+                        <div style="font-size: 0.65rem; opacity: 0.55; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #a5b4fc;">RECOMMENDED STRATEGY</div>
+                        <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-top: 2px;">{name}</div>
+                        <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 4px; color: #c7d2fe; line-height: 1.4;">Optimized best performer based on walk-forward backtest.</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("Fetch data to see market analysis")
