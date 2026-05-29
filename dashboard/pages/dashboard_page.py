@@ -277,7 +277,7 @@ def render():
     # Clean up empty lines from HTML
     realtime_panel_html_clean = "\n".join([line for line in realtime_panel_html.split("\n") if line.strip() != ""])
 
-    st.components.v1.html(realtime_panel_html_clean, height=500, scrolling=False)
+    st.iframe(realtime_panel_html_clean, height=500)
 
     # ── Trading & Execution Controls ──
     st.subheader("💱 Trading & Execution")
