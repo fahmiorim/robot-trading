@@ -1,7 +1,7 @@
 """ROI (Return on Investment) table take-profit manager."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from src.utils.logging import get_logger
 

@@ -17,6 +17,12 @@ build/
 *.swp
 *.swo
 
+# Logs
+logs/
+
+# Dashboard temp data
+dashboard/static/chart_data.json
+
 # Data & models
 trained_models/*.pkl
 *.sqlite3

@@ -6,7 +6,7 @@ always reflect the most recent market conditions.
 """
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 from src.analysis.indicators import calculate_sma, calculate_ema, \
     calculate_bollinger_bands, calculate_adx, calculate_macd, calculate_atr
@@ -88,16 +88,3 @@ class FeatureEngineer:
     def get_feature_names(self) -> List[str]:
         return self._feature_names.copy()
 
-    def sliding_window_train_data(
-        self, data: pd.DataFrame, window_size: int, step: int
-    ) -> List[pd.DataFrame]:
-        """Generate sliding windows of training data for walk-forward training."""
-        features = self.compute_features(data)
-        if len(features) < window_size:
-            return [features]
-        windows = []
-        for start in range(0, len(features) - window_size + 1, step):
-            windows.append(features.iloc[start:start + window_size])
-        if len(features) > windows[-1].index[-1] + step:
-            windows.append(features.iloc[-window_size:])
-        return windows

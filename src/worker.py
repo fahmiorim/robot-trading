@@ -10,36 +10,51 @@ Usage::
     worker.start()          # starts background thread
     worker.stop()           # stops gracefully
     worker.is_running       # bool
+
+.. versionchanged:: 2.3
+   Business logic extracted to ``CycleService``.  ``Worker`` now only
+   manages the thread lifecycle.
 """
 
 import threading
-import time
 from typing import Optional
 
 from src.services.trading.engine import TradingBot
+from src.services.cycle_service import CycleService
 from src.utils.logging import get_logger
-from src.rpc.websocket import set_shared
 
 logger = get_logger(__name__)
 
 
 class Worker:
-    """Background worker that runs trading cycles periodically.
+    """Background worker — thread lifecycle only.
 
-    The worker checks auto_trade flag in config each cycle.
-    When auto_trade is True, it runs a full trading cycle.
+    Delegates cycle business logic to ``CycleService``, keeping the
+    thread management (start/stop/join) separate from *what* happens
+    each cycle.
     """
 
-    def __init__(self, bot: TradingBot):
+    def __init__(self, bot: TradingBot,
+                 cycle_service: Optional[CycleService] = None):
         self.bot = bot
+        self._cycle_service = cycle_service or CycleService()
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._running = False
-        self._cycle_results: list = []
 
     @property
     def is_running(self) -> bool:
         return self._running
+
+    @property
+    def last_result(self) -> Optional[dict]:
+        """Delegated to CycleService."""
+        return self._cycle_service.last_result
+
+    @property
+    def cycle_results(self) -> list:
+        """Delegated to CycleService."""
+        return self._cycle_service.cycle_results
 
     def start(self) -> None:
         """Start the worker thread."""
@@ -65,67 +80,21 @@ class Worker:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
 
-    @property
-    def last_result(self) -> Optional[dict]:
-        return self._cycle_results[-1] if self._cycle_results else None
-
     def _run_loop(self) -> None:
-        """Main worker loop."""
+        """Main worker loop — delegates business logic to CycleService."""
         logger.info("Worker loop started")
 
-        # ── Establish DB connection once for this thread ────────
-        # DatabaseManager uses threading.local(), so each thread
-        # gets its own connection.  By calling connect() here we
-        # ensure the connection is ready *before* the first cycle,
-        # and the "MySQL connection established" log appears only
-        # once at worker startup.
-        try:
-            from src.persistence.database import get_db
-            get_db().connect()
-        except Exception:
-            pass
+        # Warm the DB connection for this thread (threading.local).
+        self._cycle_service.ensure_thread_db()
 
         while not self._stop_event.is_set():
             cycle_start = time.time()
             try:
-                # Check if auto_trade is enabled
-                auto = self.bot.config.get("general", "auto_trade")
-                if auto:
-                    logger.debug("Auto-trade enabled, running cycle...")
-                    result = self.bot.run_cycle()
-                    self._cycle_results.append(result)
-                    # Keep only last 100 results to prevent memory leak
-                    if len(self._cycle_results) > 100:
-                        self._cycle_results.pop(0)
-                    # Log trade alerts
-                    if result.get("success") and result.get("action") not in ("HOLD", None):
-                        self.bot.rpc.send_trade_alert(
-                            symbol=self.bot.symbol,
-                            action=result.get("action", "?"),
-                            price=result.get("price", 0),
-                            strategy=self.bot.best_strategy_name or "N/A",
-                            regime=self.bot.current_regime,
-                        )
-                else:
-                    logger.debug("Auto-trade disabled, sleeping...")
-
-                # Update shared state for WebSocket dashboard
-                status = self.bot.status()
-                set_shared("auto_trading", auto)
-                set_shared("regime", status.get("current_regime", "unknown"))
-                set_shared("best_strategy", status.get("best_strategy", "N/A"))
-                set_shared("cycle_count", status.get("cycle_count", 0))
-                set_shared("mt5_connected", status.get("connection", False))
-
+                self._cycle_service.execute_cycle(self.bot)
             except Exception as e:
                 logger.error(f"Worker cycle error: {e}")
 
-            # Sleep for cycle interval (accounting for cycle duration)
-            interval = self.bot.config.get("general", "cycle_interval_minutes")
-            elapsed = time.time() - cycle_start
-            wait_time = max(1, (interval * 60) - elapsed)
-            
-            for _ in range(int(wait_time)):
-                if self._stop_event.is_set():
-                    break
-                time.sleep(1)
+            self._cycle_service.sleep_for_interval(
+                self.bot, cycle_start,
+                should_stop=lambda: self._stop_event.is_set(),
+            )

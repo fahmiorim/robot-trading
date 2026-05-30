@@ -12,7 +12,7 @@ Usage::
     bot.status()              # get full status dict
 """
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from src.controllers.trading_controller import TradingController
 from src.utils.logging import get_logger

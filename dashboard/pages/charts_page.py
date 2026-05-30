@@ -18,17 +18,6 @@ from dashboard.helpers import ensure_mt5, refresh_robot, map_sig, get_available_
 from src.configuration import TIMEFRAME_MAP
 from src.rpc.websocket import set_shared, get_shared
 
-def format_mt5_price(price: float, digits: int = 2) -> tuple:
-    """Format a price MT5-style: split into a small part and the last two large digits."""
-    if not price or price <= 0:
-        return "0.", "00"
-    price_str = f"{price:.{digits}f}"
-    if len(price_str) >= 2:
-        return price_str[:-2], price_str[-2:]
-    return price_str, ""
-
-
-
 def render():
     st.title("📈 Charts & Market Analysis")
     config = st.session_state.config

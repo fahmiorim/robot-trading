@@ -6,7 +6,7 @@ All strategies inherit from ``IStrategy`` and are auto-discovered via the
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, Tuple, Type
 
 import pandas as pd
 

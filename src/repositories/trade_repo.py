@@ -45,13 +45,6 @@ class TradeRepository:
         rows = self._db.get_open_trades()
         return self._rows_to_trades(rows)
 
-    def find_by_ticket(self, ticket: int) -> Optional[Trade]:
-        """Find a trade by ticket number."""
-        row = self._db.get_trade_by_ticket(ticket)
-        if row:
-            return Trade.from_dict(row)
-        return None
-
     def summary(self, days: int = 30) -> Dict[str, Any]:
         """Get aggregate trade statistics."""
         return self._db.get_trade_summary(days=days)

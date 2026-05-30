@@ -2,12 +2,10 @@
 Risk manager — tracks balance, drawdown, daily loss, position limits.
 Extracted from the TradingBot class for single responsibility.
 """
-import time
 from datetime import datetime, date
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from src.risk.protection import ProtectionContext, ProtectionManager
-from src.models.trade import TradeManager
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -112,46 +110,6 @@ class RiskManager:
     def get_max_drawdown_pct(self) -> float:
         """Return maximum drawdown seen so far."""
         return max(self._max_drawdown_pct_ever, self.get_drawdown_pct())
-
-    def can_open_new_position(self, trade_manager: TradeManager) -> bool:
-        """Check if we can open a new position based on risk rules."""
-        max_positions = self.config.get("risk_management", "max_open_positions")
-        if trade_manager.open_position_count() >= max_positions:
-            logger.warning(f"Max positions ({max_positions}) reached")
-            return False
-
-        max_dd = self.config.get("risk_management", "max_drawdown_pct")
-        if self.get_drawdown_pct() >= max_dd:
-            logger.warning(f"Max drawdown ({max_dd:.0f}%) reached")
-            return False
-
-        max_daily_loss = self.config.get("risk_management", "max_daily_loss_pct")
-        if self.daily_loss_pct >= max_daily_loss:
-            logger.warning(f"Max daily loss ({max_daily_loss:.0f}%) reached")
-            return False
-
-        # Check protection rules
-        blocked, reasons = self.protection_mgr.check_all(self.protection_ctx)
-        if blocked:
-            for r in reasons:
-                logger.warning(f"Protection blocked: {r}")
-            return False
-
-        return True
-
-    def record_trade(self, profit: float) -> None:
-        """Update risk state after a trade is closed."""
-        self._last_trade_time = time.time()
-        self.protection_ctx.last_trade_time = self._last_trade_time
-        self.protection_ctx.last_trade_profit = profit
-
-        if profit < 0:
-            self.protection_ctx.consecutive_losses += 1
-            self.protection_ctx.stoploss_hits += 1
-            if self.protection_ctx.stoploss_window_start == 0:
-                self.protection_ctx.stoploss_window_start = self._last_trade_time
-        else:
-            self.protection_ctx.consecutive_losses = 0
 
     def get_state(self) -> Dict[str, Any]:
         """Return current risk state as a dict for status/display."""

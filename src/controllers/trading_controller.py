@@ -10,18 +10,17 @@ Usage:
     ctrl.status()
 """
 
-import time
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
 
 from src.configuration.manager import ConfigManager
 from src.exchange.factory import ExchangeFactory
-from src.exchange.base import IExchange
 from src.data.provider import DataProvider
 from src.rpc.base import RPCManager
 from src.rpc.websocket import set_shared
+from src.controllers.execution_mixin import ExecutionMixin
+from src.controllers.signal_mixin import SignalMixin
 from src.services.rpc_setup_service import RPCSetupService
 from src.services.signal_service import SignalService
 from src.services.strategy_service import StrategyService
@@ -45,7 +44,7 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class TradingController:
+class TradingController(ExecutionMixin, SignalMixin):
     """Thin orchestrator — initialises services and runs trading cycles."""
 
     def __init__(self, config: Optional[ConfigManager] = None,
@@ -181,92 +180,6 @@ class TradingController:
         self.strategies = self.strategy_service.strategies
         self.disabled_strategies = self.strategy_service.disabled_strategies
         return result
-
-    # ── Signal ──
-
-    def get_signal(self, data: pd.DataFrame,
-                   use_ml: bool = False,
-                   use_agent: bool = False,
-                   use_swarm: bool = False) -> int:
-        sig = self.signal_service.get_signal(
-            data=data,
-            strategies=self.strategies,
-            best_strategy=self.strategy_service.best_strategy,
-            ml_trainer=self.ml_service.trainer,
-            current_regime=self.strategy_service.current_regime,
-            use_ml=use_ml,
-            use_agent=use_agent,
-            use_swarm=use_swarm,
-            config=self.config,
-        )
-        return sig
-
-    def get_individual_signals(self, data: pd.DataFrame) -> Dict[str, int]:
-        """Get raw signals from each source individually (no consensus).
-
-        Returns dict: {"strategy": int, "ml": int, "agent": int, "swarm": int}
-        Each value: 1=BUY, -1=SELL, 0=HOLD
-        """
-        return self.signal_service.get_individual_signals(
-            data=data,
-            strategies=self.strategies,
-            best_strategy=self.strategy_service.best_strategy,
-            ml_trainer=self.ml_service.trainer,
-            config=self.config,
-        )
-
-    # ── Trade Execution ──
-
-    def open_trade(self, symbol: str, side: str, volume: float,
-                   sl: Optional[float] = None,
-                   tp: Optional[float] = None) -> Dict:
-        old_symbol = self.symbol
-        if symbol != old_symbol:
-            self.symbol = symbol
-        signal = 1 if side.lower() == "buy" else -1
-        try:
-            result = self.order_manager.execute_trade(signal, symbol, volume, sl, tp)
-            if result.get("success") and "order" in result:
-                result["ticket"] = result["order"]
-        finally:
-            self.symbol = old_symbol
-        return result
-
-    def execute_trade(self, signal: int,
-                      volume: Optional[float] = None,
-                      sl: Optional[float] = None,
-                      tp: Optional[float] = None) -> Dict:
-        return self.order_manager.execute_trade(signal, self.symbol, volume, sl, tp)
-
-    def close_position(self, ticket: int) -> Dict:
-        return self.order_manager.close_position(ticket)
-
-    def update_paper_positions(self):
-        """Public method: refresh paper positions from simulated exchange."""
-        self.order_manager.update_paper_positions()
-
-    # Keep backward-compat alias
-    _update_paper_positions = update_paper_positions
-
-    # ── ROI & DCA (via TradeExecutionService) ──
-
-    def _check_roi_take_profit(self) -> None:
-        self.trade_execution_service.check_roi_take_profit(self.paper_trading)
-
-    def _check_dca_opportunity(self) -> Optional[Dict]:
-        balance = (self.order_manager.paper_balance
-                   if hasattr(self.order_manager, 'paper_balance')
-                   else self.config.get("trading", "paper_initial_balance"))
-        return self.trade_execution_service.check_dca_opportunity(
-            paper_trading=self.paper_trading,
-            paper_positions=self.order_manager.paper_positions,
-            paper_balance=balance,
-        )
-
-    def execute_dca(self, dca_info: Dict) -> Dict:
-        return self.trade_execution_service.execute_dca(
-            dca_info, self.strategy_service.current_regime,
-        )
 
     # ── Trading Cycle ──
 
@@ -417,13 +330,6 @@ class TradingController:
     def ml_trainer(self):
         """Backward-compat: dashboard accesses robot.ml_trainer."""
         return self.ml_service.trainer
-
-    def detect_regime(self, data: pd.DataFrame) -> str:
-        """Detect market regime from price data."""
-        return self.strategy_service.detect_regime(data)
-
-    # Keep backward-compat alias
-    _detect_regime = detect_regime
 
     # ── Status ──
 

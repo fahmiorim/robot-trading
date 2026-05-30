@@ -1,6 +1,15 @@
-"""Market data database operations — caching OHLCV data from MySQL."""
+"""Market data database operations — caching OHLCV data from MySQL.
 
-from typing import Any, Dict, Optional
+Standalone class (not a mixin). Takes a DatabaseManager instance
+for connection management.
+
+Usage:
+    db = get_db()
+    md = MarketDataDB(db)
+    md.save_market_data(symbol, timeframe, df)
+"""
+
+from typing import Optional
 
 import pandas as pd
 
@@ -9,13 +18,20 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class MarketDataMixin:
-    """Mixin providing market data cache operations for DatabaseManager."""
+class MarketDataDB:
+    """Market data cache operations (OHLCV).
+
+    Standalone class (not a mixin). Takes a DatabaseManager instance
+    for connection management.
+    """
+
+    def __init__(self, db):
+        self._db = db
 
     def save_market_data(self, symbol: str, timeframe: str, df: pd.DataFrame) -> bool:
         """Save OHLCV DataFrame to market_data table."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             rows_inserted = 0
             for idx, row in df.iterrows():
@@ -45,7 +61,7 @@ class MarketDataMixin:
                          limit: int = 2000) -> Optional[pd.DataFrame]:
         """Load OHLCV data from market_data table."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT time, open, high, low, close, tick_volume, spread, real_volume

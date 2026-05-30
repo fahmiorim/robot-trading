@@ -3,27 +3,22 @@ Backtesting engine — realistic trade simulation with SL/TP, commissions, slipp
 
 Inspired by Freqtrade's backtesting engine and Backtrader analyzers.
 """
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 import numpy as np
 import pandas as pd
 
 from src.configuration.manager import ConfigManager
 from src.strategy.interface import IStrategy
-from src.analysis.performance import (
-    calculate_sharpe_ratio, calculate_sortino_ratio,
-    calculate_calmar_ratio, calculate_profit_factor,
-    calculate_cagr, calculate_sqn, calculate_expectancy,
-    calculate_streaks, calculate_monthly_returns, calculate_time_in_market,
-)
+from src.backtesting.position_manager import check_sltp, current_equity
+from src.backtesting.metrics import compute_metrics
+from src.backtesting.walk_forward import run_walk_forward
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-
 RANDOM_SEED = 42
 MIN_POSITION_SIZE = 0.01
-ANNUALIZE_THRESHOLD_YEARS = 0.1
 
 
 class Backtester:
@@ -52,8 +47,6 @@ class Backtester:
             "risk_management", "trailing_stop_activation_pct")
         self.trailing_distance_pct = config.get(
             "risk_management", "trailing_stop_distance_pct")
-        self.risk_free_rate = config.get("performance", "risk_free_rate")
-        self.periods_per_year = config.get("performance", "periods_per_year")
         self.results: Dict[str, Dict] = {}
 
     def run(self, data: pd.DataFrame, signals: pd.Series,
@@ -66,8 +59,7 @@ class Backtester:
             strategy_name: Name for result tracking.
 
         Returns:
-            Dict with metrics (return, trades, drawdown, sharpe, sortino, calmar,
-            CAGR, SQN, profit_factor, streaks, time_in_market, monthly_returns, etc.).
+            Dict with all performance metrics.
         """
         rng = np.random.RandomState(RANDOM_SEED + hash(strategy_name) % 10000)
         balance = self.initial_balance
@@ -119,10 +111,12 @@ class Backtester:
                         equity_curve.append(balance)
                         continue
 
-                pnl = self._check_sltp(position, entry_price, high, low,
-                                       price, position_size, trades, data.index[i],
-                                       sl_pct=last_sl, entry_already_deducted=True,
-                                       entry_time=entry_time, entry_comm=entry_comm)
+                pnl = check_sltp(position, entry_price, high, low,
+                                 price, position_size, trades, data.index[i],
+                                 sl_pct=last_sl, tp_pct=self.tp_pct,
+                                 commission_pct=self.commission_pct,
+                                 entry_already_deducted=True,
+                                 entry_time=entry_time, entry_comm=entry_comm)
                 if pnl is not None:
                     balance += pnl
                     position = 0
@@ -151,7 +145,7 @@ class Backtester:
                     position_size = 0.0
                     entry_time = None
 
-                # Open long — track cost basis
+                # Open long
                 risk_amt = balance * (self.position_size_pct / 100.0)
                 pos_size = risk_amt / price if price > 0 else 0.01
                 pos_size = max(MIN_POSITION_SIZE, round(pos_size, 4))
@@ -209,17 +203,16 @@ class Backtester:
                 })
 
             # Track equity
-            equity_curve.append(self._current_equity(
-                balance, position, position_size, entry_price, price))
+            equity_curve.append(
+                current_equity(balance, position, position_size, entry_price, price)
+            )
 
         # Close remaining position at last price
         if position != 0 and position_size > 0:
             last_price = float(data["close"].iloc[-1])
             if position == 1:
-                # For long: just proceeds (cost already deducted from balance at entry)
                 pnl = position_size * last_price
             else:
-                # For short: buy back at last price (balance has proceeds)
                 pnl = -position_size * last_price
             comm = last_price * position_size * (self.commission_pct / 100.0)
             balance += pnl - comm
@@ -238,110 +231,8 @@ class Backtester:
                 "entry_time": entry_time or data.index[-1],
             })
 
-        total_return = (balance - self.initial_balance) / self.initial_balance * 100
-
-        # ── Core Metrics ──
-        equity_series = pd.Series(equity_curve)
-        rolling_max = equity_series.cummax()
-        drawdown_series = (rolling_max - equity_series) / rolling_max * 100
-        max_dd = float(drawdown_series.max()) if len(drawdown_series) > 0 else 0.0
-
-        wins = sum(1 for t in trades if t.get("profit", t.get("profit_pct", 0)) > 0)
-        losses = sum(1 for t in trades if t.get("profit", t.get("profit_pct", 0)) < 0)
-        wr = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0.0
-
-        proper_trades = []
-        for t in trades:
-            if "profit" in t or "profit_pct" in t:
-                profit_val = t.get("profit", t.get("profit_pct", 0))
-                if not isinstance(profit_val, (int, float)):
-                    profit_val = 0.0
-                proper_trades.append({
-                    "profit": float(profit_val),
-                    "entry_time": t.get("entry_time"),
-                    "exit_time": t.get("time"),
-                })
-
-        # ── Advanced Metrics ──
-        returns = [t.get("profit", 0) / self.initial_balance for t in proper_trades]
-        data_span_hours = (data.index[-1] - data.index[0]).total_seconds() / 3600 \
-            if len(data) > 1 else 1.0
-        data_years = data_span_hours / (365.25 * 24)
-        if len(returns) >= 2:
-            arr = np.array(returns)
-            r_mean = float(np.mean(arr))
-            r_std = float(np.std(arr))
-            if r_std > 0:
-                # Standard Sortino downside deviation: penalize returns below 0
-                downside_diff = np.minimum(0, arr)
-                downside_dev = float(np.sqrt(np.mean(downside_diff ** 2)))
-                
-                if data_years >= ANNUALIZE_THRESHOLD_YEARS:  # ≥ threshold → annualized
-                    annual_factor = (len(returns) / max(data_years, 0.001)) ** 0.5
-                    sharpe = round(r_mean / r_std * annual_factor, 3)
-                    if downside_dev > 0:
-                        sortino = round(r_mean / downside_dev * annual_factor, 3)
-                    else:
-                        sortino = 0.0
-                else:  # < 1 bulan → raw (non-annualized)
-                    sharpe = round(r_mean / r_std, 3)
-                    if downside_dev > 0:
-                        sortino = round(r_mean / downside_dev, 3)
-                    else:
-                        sortino = 0.0
-            else:
-                sharpe = 0.0
-                sortino = 0.0
-        else:
-            sharpe = 0.0
-            sortino = 0.0
-        pf = calculate_profit_factor(proper_trades)
-        calmar = calculate_calmar_ratio(total_return, max_dd, 1.0)
-
-        total_period_hours = None
-        trade_times = [
-            t.get("time") for t in trades
-            if isinstance(t.get("time"), pd.Timestamp)
-        ]
-        if len(trade_times) >= 2:
-            span = (max(trade_times) - min(trade_times)).total_seconds() / 3600
-            total_period_hours = max(span, 1)
-
-        years = total_period_hours / (365.25 * 24) if total_period_hours else 1.0
-        cagr = calculate_cagr(self.initial_balance, balance, max(years, 0.01))
-        sqn = calculate_sqn(returns)
-        expectancy = calculate_expectancy(proper_trades, self.initial_balance)
-        streaks = calculate_streaks(proper_trades)
-        time_market = calculate_time_in_market(proper_trades, total_period_hours)
-        monthly_df = calculate_monthly_returns(proper_trades)
-
-        result = {
-            "total_return": total_return,
-            "final_balance": balance,
-            "num_trades": len(proper_trades),
-            "wins": wins,
-            "losses": losses,
-            "max_drawdown": max_dd,
-            "win_rate": round(wr, 2),
-            "sharpe_ratio": round(sharpe, 3),
-            "sortino_ratio": round(sortino, 3),
-            "calmar_ratio": round(calmar, 3),
-            "profit_factor": round(pf, 3),
-            "cagr_pct": round(cagr, 3),
-            "sqn": round(sqn, 3),
-            "expectancy_pct": round(expectancy["expectancy_pct"], 3),
-            "expectancy_ratio": round(expectancy["expectancy_ratio"], 3),
-            "avg_win_pct": round(expectancy["avg_win_pct"], 3),
-            "avg_loss_pct": round(expectancy["avg_loss_pct"], 3),
-            "longest_win_streak": streaks["longest_win_streak"],
-            "longest_loss_streak": streaks["longest_loss_streak"],
-            "current_win_streak": streaks["current_win_streak"],
-            "current_loss_streak": streaks["current_loss_streak"],
-            "time_in_market_pct": round(time_market, 2),
-            "monthly_returns": monthly_df,
-            "equity_curve": equity_curve,
-            "trades": trades,
-        }
+        # ── Compute all metrics via extracted helper ──
+        result = compute_metrics(trades, equity_curve, self.initial_balance, data)
         self.results[strategy_name] = result
         return result
 
@@ -355,46 +246,12 @@ class Backtester:
                           strategy_name: str,
                           train_frac: float = 0.7,
                           n_windows: int = 3) -> Dict[str, Any]:
-        logger.info(f"Walk-forward: {strategy_name}, {n_windows} windows")
-        n = len(data)
-        window_size = n // n_windows
-        all_trades = []
-        window_results = []
-
-        for w in range(n_windows):
-            train_end = (w + 1) * window_size
-            if train_end > n:
-                train_end = n
-            test_start = max(int(train_end * train_frac), w * window_size)
-            train_data = data.iloc[test_start:train_end]
-            gen = signal_generator(train_data)
-            if w + 1 < n_windows:
-                test_data = data.iloc[train_end:(w + 2) * window_size]
-            else:
-                test_data = data.iloc[train_end:]
-            if len(test_data) < 10:
-                continue
-            signals = gen(test_data)
-            result = self.run(test_data, signals, f"{strategy_name}_w{w}")
-            window_results.append(result)
-            all_trades.extend(result.get("trades", []))
-
-        if not window_results:
-            return {"total_return": 0, "num_trades": 0, "max_drawdown": 0,
-                    "win_rate": 0, "sharpe_ratio": 0, "equity_curve": [self.initial_balance],
-                    "trades": []}
-
-        avg_return = float(np.mean([r["total_return"] for r in window_results]))
-        return {
-            "total_return": avg_return,
-            "num_trades": sum(r["num_trades"] for r in window_results),
-            "max_drawdown": float(max(r.get("max_drawdown", 0) for r in window_results)),
-            "win_rate": float(np.mean([r.get("win_rate", 0) for r in window_results])),
-            "sharpe_ratio": float(np.mean([r.get("sharpe_ratio", 0) for r in window_results])),
-            "equity_curve": [self.initial_balance],
-            "trades": all_trades,
-            "window_results": window_results,
-        }
+        return run_walk_forward(
+            data, signal_generator, strategy_name,
+            n_windows=n_windows, train_frac=train_frac,
+            run_fn=self.run,
+            initial_balance=self.initial_balance,
+        )
 
     def compare_strategies(self) -> pd.DataFrame:
         if not self.results:
@@ -416,74 +273,3 @@ class Backtester:
             })
         df = pd.DataFrame(rows).sort_values("Return %", ascending=False)
         return df
-
-    # ── Internal helpers ──────────────────────────────────────
-
-    def _check_sltp(self, position, entry, high, low, price, size, trades, idx,
-                    sl_pct=None, entry_already_deducted=False, entry_time=None, entry_comm=0.0):
-        sl_pct = sl_pct or self.sl_pct
-        tp_pct = self.tp_pct
-
-        if position == 1:
-            sl = entry * (1 - sl_pct / 100.0)
-            tp = entry * (1 + tp_pct / 100.0)
-            if low <= sl:
-                pnl = size * sl
-                comm = sl * size * (self.commission_pct / 100.0)
-                profit_val = pnl - comm - (size * entry) - entry_comm
-                trades.append({"time": idx, "action": "SELL (SL)",
-                               "price": sl,
-                               "profit_pct": (sl - entry) / entry * 100,
-                               "profit": profit_val,
-                               "entry_time": entry_time or idx})
-                return pnl - comm - (size * entry if not entry_already_deducted else 0)
-            elif high >= tp:
-                pnl = size * tp
-                comm = tp * size * (self.commission_pct / 100.0)
-                profit_val = pnl - comm - (size * entry) - entry_comm
-                trades.append({"time": idx, "action": "SELL (TP)",
-                               "price": tp,
-                               "profit_pct": (tp - entry) / entry * 100,
-                               "profit": profit_val,
-                               "entry_time": entry_time or idx})
-                return pnl - comm - (size * entry if not entry_already_deducted else 0)
-        else:
-            sl = entry * (1 + sl_pct / 100.0)
-            tp = entry * (1 - tp_pct / 100.0)
-            if high >= sl:
-                comm = sl * size * (self.commission_pct / 100.0)
-                profit_val = (entry - sl) * size - comm - entry_comm
-                trades.append({"time": idx, "action": "BUY (SL)",
-                               "price": sl,
-                               "profit_pct": (entry - sl) / entry * 100,
-                               "profit": profit_val,
-                               "entry_time": entry_time or idx})
-                if entry_already_deducted:
-                    return -sl * size - comm
-                return profit_val
-            elif low <= tp:
-                comm = tp * size * (self.commission_pct / 100.0)
-                profit_val = (entry - tp) * size - comm - entry_comm
-                trades.append({"time": idx, "action": "BUY (TP)",
-                               "price": tp,
-                               "profit_pct": (entry - tp) / entry * 100,
-                               "profit": profit_val,
-                               "entry_time": entry_time or idx})
-                if entry_already_deducted:
-                    return -tp * size - comm
-                return profit_val
-        return None
-
-    @staticmethod
-    def _current_equity(balance, position, size, entry, price):
-        if position == 1 and size > 0:
-            return balance + size * price
-        elif position == -1 and size > 0:
-            return balance - size * price
-        return balance
-
-    @staticmethod
-    def _close_position(position, size, entry, price):
-        if position == 1:
-            return size * price - size * entry
-        return size * (entry - price)

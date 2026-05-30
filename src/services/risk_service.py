@@ -1,6 +1,6 @@
 """Risk service — risk management, circuit breaker, trailing stop."""
 
-from typing import Any, Dict, Optional
+from typing import Dict
 
 from src.utils.logging import get_logger
 
@@ -46,33 +46,6 @@ class RiskService:
         except Exception as e:
             logger.error(f"Risk check failed: {e}")
             return True
-
-    def check_circuit_breaker(self, drawdown_pct: float = None,
-                              balance_before: float = None,
-                              balance_after: float = None) -> bool:
-        """Check and trigger circuit breaker if needed."""
-        if not self.analytics_repo:
-            return False
-
-        is_active = self.analytics_repo.is_circuit_breaker_active()
-        if is_active:
-            logger.warning("Circuit breaker is active — trading paused")
-            return True
-
-        cb_threshold = self.config.get("risk_management", "circuit_breaker_loss_pct")
-        if drawdown_pct and drawdown_pct > cb_threshold:
-            cooldown = self.config.get("risk_management", "circuit_breaker_cooldown_minutes")
-            self.analytics_repo.log_circuit_breaker(
-                reason=f"Drawdown exceeded: {drawdown_pct:.1f}%",
-                drawdown_pct=drawdown_pct,
-                balance_before=balance_before,
-                balance_after=balance_after,
-                cooldown_minutes=cooldown
-            )
-            logger.warning(f"Circuit breaker triggered at {drawdown_pct:.1f}% drawdown")
-            return True
-
-        return False
 
     def update_trailing_stops(self, exchange=None, symbol: str = None) -> None:
         """Update trailing stops for open positions."""

@@ -153,7 +153,7 @@ def main(auto_trade_override: bool = False):
         robot.cleanup()
 
 
-def _health_check(robot: AIRobot, last_good_cycle: dict) -> dict:
+def _health_check(robot: AIRobot) -> dict:
     """
     Health check watchdog. Checks:
     - MT5 connection
@@ -255,7 +255,7 @@ def run_auto_cycle(count: int = -1):
 
             # Run health check periodically
             if time.time() - last_health_check >= health_check_interval:
-                hc = _health_check(robot, result)
+                hc = _health_check(robot)
                 last_health_check = time.time()
                 if not hc['healthy'] and hc.get('action') == 'restart':
                     logger.warning("Health check failed — recreating robot...")

@@ -14,7 +14,8 @@ from typing import Any, Optional
 from src.configuration.manager import ConfigManager
 from src.rpc.base import RPCManager
 from src.rpc.telegram import TelegramRPC
-from src.rpc.websocket import WebSocketRPC, start_data_pusher, set_shared
+from src.rpc.websocket import WebSocketRPC, set_shared
+from src.rpc.ws_pusher import start_data_pusher
 from src.rpc.rest_api import RestAPI
 from src.rpc.static_server import StaticFileServer
 from src.utils.logging import get_logger

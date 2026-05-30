@@ -218,12 +218,12 @@ def _render_training_history(config):
     """Render ML training history visualizations from ml_training_log table.
     Supports auto-refresh every 30 seconds when toggled.
     """
-    from src.controllers.dashboard_controller import DashboardController
+    from src.controllers.dashboard_interface import IDashboardController
     import plotly.graph_objects as go
     import plotly.express as px
     import pandas as pd
 
-    dc = st.session_state.get("dashboard_ctrl", DashboardController())
+    dc = st.session_state.get("dashboard_ctrl")
 
     # ── Real-time via WebSocket toggle ──
     ws_realtime = st.checkbox(

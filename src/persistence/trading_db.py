@@ -9,18 +9,29 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class TradingMixin:
-    """Mixin providing trade history and signal log operations for DatabaseManager."""
+class TradingDB:
+    """Trade history and signal log persistence.
+
+    Standalone class (not a mixin). Takes a DatabaseManager instance
+    for connection management.
+
+    Usage:
+        db = get_db()
+        trading = TradingDB(db)
+        trading.log_trade({...})
+    """
+
+    def __init__(self, db):
+        self._db = db
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Dict]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT * FROM trade_history WHERE ticket=%s", (ticket,))
             row = cursor.fetchone()
             cursor.close()
             if row:
-                # Convert Decimals to float
                 return {k: float(v) if hasattr(v, 'scale') else v for k, v in row.items()}
             return None
         except Exception as e:
@@ -31,7 +42,7 @@ class TradingMixin:
 
     def log_trade(self, trade: Dict[str, Any]) -> Optional[int]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO trade_history
@@ -58,7 +69,7 @@ class TradingMixin:
     def update_trade_exit(self, ticket: int, exit_price: float,
                           profit: float, exit_time: Optional[datetime] = None) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE trade_history SET status='closed', exit_price=%s,
@@ -75,12 +86,12 @@ class TradingMixin:
 
     def get_trade_history(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT * FROM trade_history ORDER BY entry_time DESC LIMIT %s OFFSET %s
             """, (limit, offset))
-            rows = self._rows_to_dicts(cursor.fetchall())
+            rows = self._db._rows_to_dicts(cursor.fetchall())
             cursor.close()
             return rows
         except Exception as e:
@@ -89,12 +100,12 @@ class TradingMixin:
 
     def get_open_trades(self) -> List[Dict]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT * FROM trade_history WHERE status='open' ORDER BY entry_time DESC
             """)
-            rows = self._rows_to_dicts(cursor.fetchall())
+            rows = self._db._rows_to_dicts(cursor.fetchall())
             cursor.close()
             return rows
         except Exception as e:
@@ -105,7 +116,7 @@ class TradingMixin:
 
     def get_trade_summary(self, days: int = 30) -> Dict[str, Any]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT
@@ -132,7 +143,7 @@ class TradingMixin:
 
     def log_signal(self, signal_data: Dict[str, Any]) -> Optional[int]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO signal_log (symbol, timestamp, source, signal_val, regime, price, details)

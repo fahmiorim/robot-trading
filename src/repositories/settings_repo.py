@@ -82,15 +82,6 @@ class SettingsRepository:
         """Get a single setting by section + key + optional context."""
         return self._db.get_setting(section, key_name, symbol=symbol, timeframe=timeframe)
 
-    def find_value(self, section: str, key_name: str, default: Any = None,
-                    symbol: Optional[str] = None,
-                    timeframe: Optional[str] = None) -> Any:
-        """Get the value of a single setting, with optional context."""
-        setting = self.find(section, key_name, symbol=symbol, timeframe=timeframe)
-        if setting:
-            return setting.get("value", default)
-        return default
-
     # ── Write ──
 
     def set(self, section: str, key_name: str, value: Any,

@@ -29,14 +29,4 @@ class MarketDataRepository:
         """Save market data to database cache."""
         return self._db.save_market_data(symbol, timeframe, df)
 
-    def delete_old(self, symbol: str, timeframe: str, keep_count: int) -> bool:
-        """Delete old candles, keeping only the most recent keep_count."""
-        try:
-            df = self.load(symbol, timeframe, limit=keep_count + 100)
-            if df is not None and len(df) > keep_count:
-                # Re-save only the latest keep_count rows
-                self.save(symbol, timeframe, df.tail(keep_count))
-            return True
-        except Exception as e:
-            logger.error(f"Failed to trim market data: {e}")
-            return False
+

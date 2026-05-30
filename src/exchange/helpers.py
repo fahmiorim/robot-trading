@@ -5,7 +5,7 @@ Consolidated from the old ``src/util/mt5_helpers.py`` and deduplicated from
 individual exchange implementations. Exchange classes delegate to these helpers
 instead of reimplementing the logic.
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from src.utils.logging import get_logger
 
@@ -94,39 +94,6 @@ def validate_volume(volume: float,
         volume = round(volume / volume_step) * volume_step
     return max(volume_min, min(volume, volume_max))
 
-
-def normalise_price(price: float, digits: int) -> float:
-    """Round price to the given number of decimal places."""
-    return round(price, digits)
-
-
-def validate_sltp_distance(entry: float,
-                           sl: Optional[float],
-                           tp: Optional[float],
-                           min_stops: int,
-                           point: float,
-                           digits: int) -> Tuple[Optional[float], Optional[float]]:
-    """Enforce broker minimum stops level distance for SL/TP."""
-    if min_stops <= 0 or point <= 0:
-        return sl, tp
-
-    min_dist = min_stops * point
-
-    if sl is not None:
-        dist = abs(entry - sl)
-        if dist < min_dist:
-            adjusted = entry - min_dist if sl < entry else entry + min_dist
-            sl = round(adjusted, digits)
-            logger.warning(f"SL adjusted to {sl} (min dist {min_dist:.{digits}f})")
-
-    if tp is not None:
-        dist = abs(entry - tp)
-        if dist < min_dist:
-            adjusted = entry + min_dist if tp > entry else entry - min_dist
-            tp = round(adjusted, digits)
-            logger.warning(f"TP adjusted to {tp} (min dist {min_dist:.{digits}f})")
-
-    return sl, tp
 
 
 def default_sl(price: float, side: str, pct: float) -> float:

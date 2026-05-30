@@ -1,7 +1,7 @@
 """Configuration domain models — typed wrappers over raw config dicts."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass

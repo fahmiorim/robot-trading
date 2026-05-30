@@ -1,6 +1,6 @@
 """Trade execution service — order execution, DCA management, ROI take-profit."""
 
-from typing import Any, Callable, Dict, Optional
+from typing import Dict, Optional
 
 from src.configuration.manager import ConfigManager
 from src.utils.logging import get_logger

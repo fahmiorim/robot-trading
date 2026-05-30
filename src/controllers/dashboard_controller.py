@@ -3,21 +3,21 @@
 The dashboard controller decouples the UI from the trading bot internals.
 Dashboard pages call this controller instead of importing TradingBot or DB directly.
 
+Implements ``IDashboardController`` interface so pages can depend on the
+abstract contract rather than the concrete class.
+
 Usage:
     ctrl = DashboardController()
     status = ctrl.get_status()
     trades = ctrl.get_trade_history()
-    comparison = ctrl.get_strategy_comparison()
 """
 
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
-
 from src.configuration.manager import ConfigManager
 from src.models.backtest import HyperoptResult
 from src.models.config import BotConfig
-from src.services.backtest_service import BacktestService
+from src.controllers.dashboard_interface import IDashboardController
 from src.repositories.analytics_repo import AnalyticsRepository
 from src.repositories.trade_repo import TradeRepository
 from src.repositories.settings_repo import SettingsRepository
@@ -27,8 +27,11 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class DashboardController:
-    """Clean API for Streamlit dashboard — no direct bot or DB imports in pages."""
+class DashboardController(IDashboardController):
+    """Clean API for Streamlit dashboard — no direct bot or DB imports in pages.
+
+    Implements :class:`IDashboardController` interface.
+    """
 
     def __init__(self, config: Optional[ConfigManager] = None):
         self.config = config or ConfigManager(db=get_db())
@@ -54,9 +57,6 @@ class DashboardController:
             "paper_trading": self.config.get("trading", "mode") in ("paper", "dry-run"),
         })
         return status
-
-    def get_config_value(self, section: str, key: str, default=None):
-        return self.config.get(section, key)
 
     # ── Trade History ──
 
@@ -97,14 +97,3 @@ class DashboardController:
 
     def set_setting(self, section: str, key: str, value: Any) -> bool:
         return self.settings_repo.set(section, key, value)
-
-    # ── Helpers ──
-
-    def check_connection(self) -> bool:
-        """Check if database is accessible."""
-        try:
-            db = get_db()
-            return db.is_connected() if hasattr(db, 'is_connected') else True
-        except Exception as e:
-            logger.warning(f"Database connection check failed: {e}")
-            return False

@@ -2,12 +2,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import urllib.parse
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 from dashboard.helpers import refresh_robot
 from dashboard.pages.performance.hyperopt_runner import get_hyperopt_runner
-from src.controllers.dashboard_controller import DashboardController
+from src.controllers.dashboard_interface import IDashboardController
 from dashboard.pages.performance.helpers import _clean_html, _info_banner, _metrics_bar
 
 def _render_progress_ui(runner_status):
@@ -360,7 +359,7 @@ def render(config):
     st.markdown("---")
     with st.expander("📚 Riwayat Hyperopt Sebelumnya (dari Database)"):
         try:
-            dc = st.session_state.get("dashboard_ctrl", DashboardController())
+            dc = st.session_state.get("dashboard_ctrl")
             prev_runs = dc.get_all_hyperopt_results()
             if prev_runs:
                 for row in prev_runs:

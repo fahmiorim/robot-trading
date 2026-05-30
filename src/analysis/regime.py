@@ -5,7 +5,6 @@ Uses ADX from shared indicators instead of duplicating the calculation.
 """
 import numpy as np
 import pandas as pd
-from typing import Optional
 
 from src.analysis.indicators import calculate_adx
 

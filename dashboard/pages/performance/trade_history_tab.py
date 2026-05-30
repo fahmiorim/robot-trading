@@ -4,7 +4,7 @@ import pandas as pd
 from dashboard.helpers import ensure_mt5
 from dashboard.components import render_trade_metrics
 from src.exchange.helpers import get_trade_history
-from src.controllers.dashboard_controller import DashboardController
+from src.controllers.dashboard_interface import IDashboardController
 from dashboard.pages.performance.helpers import _info_banner, _metrics_bar
 
 def render(config):
@@ -16,7 +16,7 @@ def render(config):
     with col2:
         source = st.radio("📡 Sumber Data", ["🤖 Robot Database", "📊 MT5 Platform"], horizontal=True, key="th_source")
 
-    dc: DashboardController = st.session_state.get("dashboard_ctrl", DashboardController())
+    dc: IDashboardController = st.session_state.get("dashboard_ctrl")
 
     try:
         if source == "🤖 Robot Database":

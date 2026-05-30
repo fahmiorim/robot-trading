@@ -6,7 +6,7 @@ with a common interface so the bot can send alerts, performance reports, and
 status updates without caring about the transport.
 """
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional
 
 
 class IRPC(ABC):

@@ -1,8 +1,8 @@
 """Market data domain models — pure data classes for OHLCV and market state."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import pandas as pd
 

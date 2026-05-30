@@ -1,6 +1,6 @@
 """Trade domain models — pure data classes with no I/O dependencies."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 

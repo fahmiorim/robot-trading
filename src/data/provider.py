@@ -90,17 +90,6 @@ class DataProvider:
     def last_data(self) -> Optional[pd.DataFrame]:
         return self._last_data
 
-    def ohlcv(self, column: str = "close") -> pd.Series:
-        """Convenience: get a single price column from last fetched data."""
-        if self._last_data is None or column not in self._last_data.columns:
-            return pd.Series(dtype=float)
-        return self._last_data[column]
-
-    def clear_cache(self) -> None:
-        _data_cache.clear()
-        self._last_data = None
-        logger.info("Data cache cleared")
-
     # ── Cache Tiers ───────────────────────────────────────────
 
     def _check_memory_cache(self, count: int) -> Optional[pd.DataFrame]:

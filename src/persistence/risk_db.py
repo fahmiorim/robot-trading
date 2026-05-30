@@ -1,4 +1,13 @@
-"""Risk state database operations from MySQL."""
+"""Risk state database operations from MySQL.
+
+Standalone class (not a mixin). Takes a DatabaseManager instance
+for connection management.
+
+Usage:
+    db = get_db()
+    risk = RiskDB(db)
+    risk.save_risk_state(...)
+"""
 
 from typing import Any, Dict, Optional
 
@@ -7,14 +16,21 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class RiskStateMixin:
-    """Mixin providing risk state operations for DatabaseManager."""
+class RiskDB:
+    """Risk state persistence operations.
+
+    Standalone class (not a mixin). Takes a DatabaseManager instance
+    for connection management.
+    """
+
+    def __init__(self, db):
+        self._db = db
 
     def save_risk_state(self, symbol: str, initial_balance: Optional[float],
                         peak_balance: Optional[float],
                         daily_start_balance: Optional[float]) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO risk_state (id, symbol, initial_balance, peak_balance, daily_start_balance)
@@ -34,7 +50,7 @@ class RiskStateMixin:
 
     def load_risk_state(self) -> Optional[Dict[str, Any]]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT * FROM risk_state WHERE id=1")
             row = cursor.fetchone()

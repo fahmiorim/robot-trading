@@ -181,8 +181,8 @@ CREATE TABLE IF NOT EXISTS ml_training_log (
 CREATE TABLE IF NOT EXISTS settings (
     section     VARCHAR(50) NOT NULL,
     key_name    VARCHAR(50) NOT NULL,
-    symbol      VARCHAR(20) NOT NULL DEFAULT '' COMMENT '' = global default',
-    timeframe   VARCHAR(30) NOT NULL DEFAULT '' COMMENT '' = global default',
+    symbol      VARCHAR(20) NOT NULL DEFAULT '' COMMENT 'empty = global default',
+    timeframe   VARCHAR(30) NOT NULL DEFAULT '' COMMENT 'empty = global default',
     value       TEXT,
     value_type  VARCHAR(20) NOT NULL DEFAULT 'string',  -- string / int / float / bool / json
     description VARCHAR(255) DEFAULT '',

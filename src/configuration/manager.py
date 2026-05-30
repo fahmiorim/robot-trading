@@ -22,6 +22,7 @@ Usage::
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.configuration.config_validation import validate_config
 from src.constants.timeframes import TIMEFRAME_MAP  # noqa: F401
 from src.utils.logging import get_logger
 
@@ -93,27 +94,6 @@ class ConfigManager:
             self._resolve_context()
             label = f"{symbol or 'GLOBAL'}/{timeframe or 'GLOBAL'}"
             logger.info(f"Config context set to: {label}")
-
-    def set_timeframe_context(self, timeframe: Optional[str]) -> None:
-        """Set context to timeframe-only mode.
-
-        After calling this, ``get()`` will prefer values saved for this
-        timeframe across ALL symbols, then fall back to global defaults.
-
-        Useful for settings that depend on candle speed/frequency
-        (e.g. cycle_interval, cooldown, data_count) but are the same
-        regardless of which symbol is being traded.
-        """
-        changed = self._context_timeframe != timeframe
-        self._context_symbol = None  # timeframe-only: no symbol binding
-        self._context_timeframe = timeframe
-        if changed:
-            self._resolve_context()
-            logger.info(f"Config context set to timeframe-only: {timeframe or 'GLOBAL'}")
-
-    def clear_context(self) -> None:
-        """Clear context — all get() calls return global defaults."""
-        self.set_context(None, None)
 
     def _resolve_context(self) -> None:
         """Re-resolve all settings for the current context into self.config.
@@ -411,20 +391,6 @@ class ConfigManager:
         """Return a deep copy of the entire config dict."""
         return deepcopy(self.config)
 
-    # ── Convenience ───────────────────────────────────────────
-
-    def get_timeframe_mt5(self) -> int:
-        tf = self.get("general", "timeframe")
-        if tf not in TIMEFRAME_MAP:
-            raise ValueError(f"Unknown timeframe '{tf}'; valid: {list(TIMEFRAME_MAP)}")
-        return TIMEFRAME_MAP[tf]
-
-    def get_strategy_params(self, name: str) -> Dict[str, Any]:
-        return self.get("strategies", name) or {}
-
-    def is_strategy_enabled(self, name: str) -> bool:
-        return bool(self.get("strategies", name, "enabled"))
-
     # ── Merge ─────────────────────────────────────────────────
 
     @staticmethod
@@ -439,92 +405,5 @@ class ConfigManager:
 
     def validate(self) -> List[str]:
         """Validate config values. Returns list of error/warning messages."""
-        errors: List[str] = []
+        return validate_config(self)
 
-        symbol = self.get("general", "symbol")
-        if not symbol or not isinstance(symbol, str):
-            errors.append("general.symbol: must be a non-empty string")
-
-        tf = self.get("general", "timeframe")
-        if tf and tf not in TIMEFRAME_MAP:
-            errors.append(f"general.timeframe: '{tf}' invalid")
-
-        pos_size = self.get("risk_management", "position_size_pct")
-        if pos_size is not None and not (0.01 <= pos_size <= 100):
-            errors.append(f"risk_management.position_size_pct: {pos_size} out of range")
-
-        max_dd = self.get("risk_management", "max_drawdown_pct")
-        if max_dd is not None and not (0.1 <= max_dd <= 100):
-            errors.append(f"risk_management.max_drawdown_pct: {max_dd} out of range")
-
-        max_loss = self.get("risk_management", "max_daily_loss_pct")
-        if max_loss is not None and not (0.1 <= max_loss <= 100):
-            errors.append(f"risk_management.max_daily_loss_pct: {max_loss} out of range")
-
-        sl = self.get("risk_management", "stop_loss_pct")
-        if sl is not None and not (0.01 <= sl <= 50):
-            errors.append(f"risk_management.stop_loss_pct: {sl} out of range")
-
-        tp = self.get("risk_management", "take_profit_pct")
-        if tp is not None and not (0.01 <= tp <= 100):
-            errors.append(f"risk_management.take_profit_pct: {tp} out of range")
-
-        max_pos = self.get("risk_management", "max_open_positions")
-        if max_pos is not None and not (1 <= max_pos <= 100):
-            errors.append(f"risk_management.max_open_positions: {max_pos} out of range")
-
-        model = self.get("ml", "model_type")
-        valid = {"random_forest", "gradient_boosting"}
-        if model and model not in valid:
-            errors.append(f"ml.model_type: '{model}' not in {valid}")
-
-        bt_bal = self.get("backtest", "initial_balance")
-        if bt_bal is not None and bt_bal <= 0:
-            errors.append("backtest.initial_balance: must be positive")
-
-        tg_enabled = self.get("notifications", "telegram_enabled")
-        if tg_enabled:
-            if not self.get("notifications", "telegram_bot_token"):
-                errors.append("telegram_bot_token required when telegram_enabled=True")
-            if not self.get("notifications", "telegram_chat_id"):
-                errors.append("telegram_chat_id required when telegram_enabled=True")
-
-        if errors:
-            for e in errors:
-                logger.warning(f"Config validation: {e}")
-        else:
-            logger.info("Config validation passed")
-        return errors
-
-    def validate_and_fix(self) -> List[str]:
-        """Validate config — reports errors instead of auto-fixing missing/invalid values.
-
-        All config values must come from the database seed — no silent fallbacks.
-        """
-        errors = self.validate()
-
-        sl = self.get("risk_management", "stop_loss_pct")
-        if sl is None or sl <= 0:
-            errors.append(
-                "risk_management.stop_loss_pct: missing or invalid — "
-                "must be provided by DB seed data"
-            )
-        tp = self.get("risk_management", "take_profit_pct")
-        if tp is None or tp <= 0:
-            errors.append(
-                "risk_management.take_profit_pct: missing or invalid — "
-                "must be provided by DB seed data"
-            )
-        ps = self.get("risk_management", "position_size_pct")
-        if ps is None or ps <= 0:
-            errors.append(
-                "risk_management.position_size_pct: missing or invalid — "
-                "must be provided by DB seed data"
-            )
-
-        if errors:
-            for e in errors:
-                logger.warning(f"Config validation: {e}")
-        else:
-            logger.info("Config validation passed")
-        return errors

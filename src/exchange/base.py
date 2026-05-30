@@ -9,7 +9,7 @@ Architecture inspired by Freqtrade's exchange module:
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 

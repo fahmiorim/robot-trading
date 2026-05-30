@@ -1,7 +1,13 @@
+"""Analytics database operations — performance, equity, circuit breaker, hyperopt, ML logs."""
+
 import json
 import numpy as np
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _clean_numpy_types(obj: Any) -> Any:
@@ -19,19 +25,27 @@ def _clean_numpy_types(obj: Any) -> Any:
         return [_clean_numpy_types(x) for x in obj.tolist()]
     return obj
 
-from src.utils.logging import get_logger
 
-logger = get_logger(__name__)
+class AnalyticsDB:
+    """Analytics persistence (performance, equity, circuit breaker, hyperopt, ML logs).
 
+    Standalone class (not a mixin). Takes a DatabaseManager instance
+    for connection management.
 
-class AnalyticsMixin:
-    """Mixin providing analytics operations for DatabaseManager."""
+    Usage:
+        db = get_db()
+        analytics = AnalyticsDB(db)
+        analytics.log_performance({...})
+    """
+
+    def __init__(self, db):
+        self._db = db
 
     # ── Performance Log ──────────────────────────────────────
 
     def log_performance(self, perf: Dict[str, Any]) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO performance_log
@@ -60,7 +74,7 @@ class AnalyticsMixin:
     def save_equity_snapshot(self, balance: float, equity: Optional[float] = None,
                              drawdown_pct: Optional[float] = None) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO equity_snapshots (timestamp, balance, equity, drawdown_pct)
@@ -75,7 +89,7 @@ class AnalyticsMixin:
 
     def get_equity_curve(self, days: int = 30) -> List[Dict]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT timestamp, balance, equity, drawdown_pct
@@ -83,7 +97,7 @@ class AnalyticsMixin:
                 WHERE timestamp >= NOW() - INTERVAL %s DAY
                 ORDER BY timestamp ASC
             """, (days,))
-            rows = self._rows_to_dicts(cursor.fetchall())
+            rows = self._db._rows_to_dicts(cursor.fetchall())
             cursor.close()
             return rows
         except Exception as e:
@@ -94,7 +108,7 @@ class AnalyticsMixin:
 
     def save_config_snapshot(self, config_dict: Dict, notes: str = "") -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO config_snapshots (config_json, notes) VALUES (%s, %s)
@@ -113,7 +127,7 @@ class AnalyticsMixin:
                             balance_after: Optional[float] = None,
                             cooldown_minutes: int = 120) -> Optional[int]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO circuit_breaker_log
@@ -130,10 +144,8 @@ class AnalyticsMixin:
 
     def is_circuit_breaker_active(self, cooldown_minutes: int = 120) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
-            # Use COALESCE for auto_reset_at, if it exists and is in the future, it's active.
-            # Otherwise, check the cooldown from triggered_at.
             cursor.execute("""
                 SELECT * FROM circuit_breaker_log
                 WHERE status='active' AND (
@@ -155,7 +167,7 @@ class AnalyticsMixin:
                              score: float, metrics: Dict[str, Any],
                              n_trials: int, elapsed: float) -> bool:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             clean_params = _clean_numpy_types(params)
             clean_metrics = {k: v for k, v in metrics.items()
@@ -184,7 +196,7 @@ class AnalyticsMixin:
 
     def get_best_hyperopt_params(self, strategy_name: str) -> Optional[Dict[str, Any]]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT best_params, best_score FROM hyperopt_results
@@ -203,7 +215,7 @@ class AnalyticsMixin:
     def get_all_hyperopt_results(self) -> List[Dict]:
         """Get all hyperopt results from the database."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT strategy_name, best_params, best_score, metrics, n_trials, elapsed_seconds, created_at
@@ -230,7 +242,7 @@ class AnalyticsMixin:
     def save_ml_training_log(self, log_data: Dict[str, Any]) -> bool:
         """Save an ML training run record to ml_training_log."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             params_json = json.dumps(_clean_numpy_types(log_data.get('params_used', {})))
             class_dist_json = json.dumps(_clean_numpy_types(log_data.get('class_distribution', {})))
@@ -271,9 +283,9 @@ class AnalyticsMixin:
                             timeframe: Optional[str] = None) -> List[Dict]:
         """Get recent ML training runs, newest first."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
-            
+
             query = "SELECT * FROM ml_training_log"
             params = []
             conditions = []
@@ -283,13 +295,13 @@ class AnalyticsMixin:
             if timeframe:
                 conditions.append("timeframe = %s")
                 params.append(timeframe)
-            
+
             if conditions:
                 query += " WHERE " + " AND ".join(conditions)
-                
+
             query += " ORDER BY trained_at DESC LIMIT %s"
             params.append(limit)
-            
+
             cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
             cursor.close()
@@ -302,7 +314,7 @@ class AnalyticsMixin:
                             entry[json_field] = json.loads(entry[json_field])
                         except Exception:
                             pass
-                result.append(self._rows_to_dicts([entry])[0])
+                result.append(self._db._rows_to_dicts([entry])[0])
             return result
         except Exception as e:
             logger.error(f"Get ML training log failed: {e}")
@@ -316,7 +328,7 @@ class AnalyticsMixin:
                          error_message: Optional[str] = None) -> bool:
         """Log a health check entry to the health_check_log table."""
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO health_check_log

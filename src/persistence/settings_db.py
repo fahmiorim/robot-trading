@@ -1,6 +1,14 @@
-"""Settings database operations — settings CRUD from MySQL."""
+"""Settings database operations — settings CRUD from MySQL.
 
-import json
+Standalone class (not a mixin). Takes a DatabaseManager instance
+for connection management.
+
+Usage:
+    db = get_db()
+    settings = SettingsDB(db)
+    settings.get_all_settings(...)
+"""
+
 import os
 import re
 from typing import Any, Dict, List, Optional
@@ -12,8 +20,20 @@ logger = get_logger(__name__)
 _SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "schema.sql")
 
 
-class SettingsMixin:
-    """Mixin providing settings CRUD operations for DatabaseManager."""
+class SettingsDB:
+    """Settings CRUD operations.
+
+    Standalone class (not a mixin). Takes a DatabaseManager instance
+    for connection management.
+
+    Usage:
+        db = get_db()
+        settings = SettingsDB(db)
+        settings.get_all_settings(...)
+    """
+
+    def __init__(self, db):
+        self._db = db
 
     def seed_settings(self) -> bool:
         """Seed missing settings from schema.sql using INSERT IGNORE.
@@ -24,7 +44,7 @@ class SettingsMixin:
         Safe to call on every startup — idempotent.
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             sql_path = _SCHEMA_PATH
             if not os.path.isfile(sql_path):
                 logger.warning(f"schema.sql not found at {sql_path}")
@@ -61,14 +81,16 @@ class SettingsMixin:
             logger.error(f"Seed settings failed: {e}")
             return False
 
-    def _db_to_internal(self, symbol: str, timeframe: str) -> tuple:
+    @staticmethod
+    def _db_to_internal(symbol: str, timeframe: str) -> tuple:
         """Map DB empty string to None for internal Python API."""
         return (
             None if symbol == '' else symbol,
             None if timeframe == '' else timeframe,
         )
 
-    def _internal_to_db(self, symbol: Optional[str], timeframe: Optional[str]) -> tuple:
+    @staticmethod
+    def _internal_to_db(symbol: Optional[str], timeframe: Optional[str]) -> tuple:
         """Map None to empty string for DB storage."""
         return (
             '' if symbol is None else symbol,
@@ -84,7 +106,7 @@ class SettingsMixin:
         If neither is provided, returns only global defaults (backward compat).
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             if symbol is not None and timeframe is not None:
                 db_sym, db_tf = self._internal_to_db(symbol, timeframe)
@@ -109,7 +131,7 @@ class SettingsMixin:
             for row in rows:
                 section = row['section']
                 key_name = row['key_name']
-                value = self._cast_value(row['value'], row['value_type'])
+                value = self._db._cast_value(row['value'], row['value_type'])
                 row_sym, row_tf = self._db_to_internal(
                     row['symbol'], row['timeframe']
                 )
@@ -134,7 +156,7 @@ class SettingsMixin:
         Returns '' mapped to None for global context.
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             cursor.execute("""
                 SELECT section, key_name, symbol, timeframe, value, value_type
@@ -143,7 +165,7 @@ class SettingsMixin:
             rows = cursor.fetchall()
             cursor.close()
             for row in rows:
-                row['value'] = self._cast_value(row['value'], row['value_type'])
+                row['value'] = self._db._cast_value(row['value'], row['value_type'])
                 # Map '' -> None for Python API
                 row['symbol'] = None if row['symbol'] == '' else row['symbol']
                 row['timeframe'] = None if row['timeframe'] == '' else row['timeframe']
@@ -156,7 +178,7 @@ class SettingsMixin:
                      symbol: Optional[str] = None,
                      timeframe: Optional[str] = None) -> Optional[Dict]:
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor(dictionary=True)
             if symbol is not None and timeframe is not None:
                 db_sym, db_tf = self._internal_to_db(symbol, timeframe)
@@ -192,10 +214,10 @@ class SettingsMixin:
                      symbol: Optional[str] = None,
                      timeframe: Optional[str] = None) -> bool:
         try:
-            value_type = self._infer_type(value)
-            value_str = self._stringify(value, value_type)
+            value_type = self._db._infer_type(value)
+            value_str = self._db._stringify(value, value_type)
             db_sym, db_tf = self._internal_to_db(symbol, timeframe)
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO settings (section, key_name, symbol, timeframe, value, value_type)
@@ -216,7 +238,7 @@ class SettingsMixin:
         Only keeps rows where symbol='' AND timeframe='' (global defaults).
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute("""
                 DELETE FROM settings
@@ -240,7 +262,7 @@ class SettingsMixin:
         Global defaults (symbol='', timeframe='') are preserved.
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM settings WHERE timeframe = %s AND timeframe != ''",
@@ -264,7 +286,7 @@ class SettingsMixin:
         Call seed_settings() afterward to re-insert factory defaults.
         """
         try:
-            conn = self.connect()
+            conn = self._db.connect()
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM settings WHERE symbol = '' AND timeframe = ''"

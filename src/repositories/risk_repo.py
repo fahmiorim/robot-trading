@@ -1,6 +1,6 @@
 """Risk state repository — wraps RiskStateMixin for risk persistence."""
 
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from src.models.risk import RiskState
 from src.utils.logging import get_logger

@@ -55,10 +55,6 @@ class AnalysisController:
             train_frac=train_frac, n_windows=n_windows,
         )
 
-    def get_comparison_df(self) -> pd.DataFrame:
-        """Get DataFrame comparing strategy backtest results."""
-        return self.backtest_service.engine.compare_strategies()
-
     # ── Hyperparameter Optimization ──
 
     def run_hyperopt(self, strategy_cls: type, data: pd.DataFrame,

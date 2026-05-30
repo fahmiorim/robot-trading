@@ -3,7 +3,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from src.configuration.manager import ConfigManager
 from src.ml.model import MLModel

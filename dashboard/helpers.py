@@ -1,8 +1,7 @@
 """Helper functions for the dashboard — MT5 connection, symbol cache, robot lifecycle."""
 
 import time
-from datetime import datetime
-from typing import List, Optional
+from typing import List
 import streamlit as st
 import MetaTrader5 as mt5
 from src.configuration.manager import ConfigManager

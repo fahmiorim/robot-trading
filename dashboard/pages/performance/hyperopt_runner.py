@@ -1,6 +1,5 @@
 """Background runner for Hyperparameter Optimization."""
 import threading
-import time
 from typing import Any, Dict, Optional, List
 import pandas as pd
 import numpy as np

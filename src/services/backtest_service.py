@@ -81,6 +81,3 @@ class BacktestService:
         """Get number of backtest results."""
         return len(self.engine.results)
 
-    def get_results_summary(self) -> Dict[str, Any]:
-        """Get summary of all backtest results."""
-        return dict(self.engine.results)
